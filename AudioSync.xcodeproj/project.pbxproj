@@ -8,12 +8,14 @@
 
 /* Begin PBXBuildFile section */
 		F808FE022DD8B57F0041F8CA /* Regex in Frameworks */ = {isa = PBXBuildFile; productRef = F808FE012DD8B57F0041F8CA /* Regex */; };
+		F86657082DDC252100E55B82 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = F86657072DDC251800E55B82 /* README.md */; };
 		F8F61C9D2DC0999C007B028F /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8F61C9C2DC0999C007B028F /* AppKit.framework */; };
 		F8F61C9F2DC099A4007B028F /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8F61C9E2DC099A4007B028F /* CoreAudio.framework */; };
 		F8F61CA12DC099AB007B028F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8F61CA02DC099AB007B028F /* Foundation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		F86657072DDC251800E55B82 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		F8F61C892DC097BD007B028F /* AudioSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AudioSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8F61C9C2DC0999C007B028F /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		F8F61C9E2DC099A4007B028F /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
@@ -62,6 +64,7 @@
 				F8F61C8B2DC097BD007B028F /* AudioSync */,
 				F8F61C9B2DC0999C007B028F /* Frameworks */,
 				F8F61C8A2DC097BD007B028F /* Products */,
+				F86657072DDC251800E55B82 /* README.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -151,6 +154,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F86657082DDC252100E55B82 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
