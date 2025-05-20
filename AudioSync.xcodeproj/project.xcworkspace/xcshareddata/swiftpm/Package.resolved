@@ -1,0 +1,15 @@
+{
+  "originHash" : "b41a5698749b3f12ac71ad125cb26846075032f8675c8d5f8d02af2cf0ed753e",
+  "pins" : [
+    {
+      "identity" : "regex",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ddddxxx/Regex",
+      "state" : {
+        "branch" : "master",
+        "revision" : "4f8482263ada7ab9c39cfffe40f99b0afbf1fbc1"
+      }
+    }
+  ],
+  "version" : 3
+}

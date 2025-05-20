@@ -6,13 +6,36 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F808FE022DD8B57F0041F8CA /* Regex in Frameworks */ = {isa = PBXBuildFile; productRef = F808FE012DD8B57F0041F8CA /* Regex */; };
+		F8F61C9D2DC0999C007B028F /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8F61C9C2DC0999C007B028F /* AppKit.framework */; };
+		F8F61C9F2DC099A4007B028F /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8F61C9E2DC099A4007B028F /* CoreAudio.framework */; };
+		F8F61CA12DC099AB007B028F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8F61CA02DC099AB007B028F /* Foundation.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		F8F61C892DC097BD007B028F /* AudioSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AudioSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F8F61C9C2DC0999C007B028F /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		F8F61C9E2DC099A4007B028F /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
+		F8F61CA02DC099AB007B028F /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F825553C2DD1EA1F00270D0E /* Exceptions for "AudioSync" folder in "AudioSync" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F8F61C882DC097BD007B028F /* AudioSync */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F8F61C8B2DC097BD007B028F /* AudioSync */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F825553C2DD1EA1F00270D0E /* Exceptions for "AudioSync" folder in "AudioSync" target */,
+			);
 			path = AudioSync;
 			sourceTree = "<group>";
 		};
@@ -23,6 +46,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F808FE022DD8B57F0041F8CA /* Regex in Frameworks */,
+				F8F61C9F2DC099A4007B028F /* CoreAudio.framework in Frameworks */,
+				F8F61CA12DC099AB007B028F /* Foundation.framework in Frameworks */,
+				F8F61C9D2DC0999C007B028F /* AppKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -33,6 +60,7 @@
 			isa = PBXGroup;
 			children = (
 				F8F61C8B2DC097BD007B028F /* AudioSync */,
+				F8F61C9B2DC0999C007B028F /* Frameworks */,
 				F8F61C8A2DC097BD007B028F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -43,6 +71,16 @@
 				F8F61C892DC097BD007B028F /* AudioSync.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		F8F61C9B2DC0999C007B028F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F8F61CA02DC099AB007B028F /* Foundation.framework */,
+				F8F61C9E2DC099A4007B028F /* CoreAudio.framework */,
+				F8F61C9C2DC0999C007B028F /* AppKit.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -65,6 +103,7 @@
 			);
 			name = AudioSync;
 			packageProductDependencies = (
+				F808FE012DD8B57F0041F8CA /* Regex */,
 			);
 			productName = AudioSync;
 			productReference = F8F61C892DC097BD007B028F /* AudioSync.app */;
@@ -94,6 +133,9 @@
 			);
 			mainGroup = F8F61C802DC097BD007B028F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F808FE002DD8B57F0041F8CA /* XCRemoteSwiftPackageReference "Regex" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F8F61C8A2DC097BD007B028F /* Products */;
 			projectDirPath = "";
@@ -254,9 +296,12 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"AudioSync/Preview Content\"";
 				DEVELOPMENT_TEAM = 33K23QULT8;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AudioSync/Info.plist;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "App 需要控制 Music 以获取当前播放状态和歌词同步";
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "需要访问 Apple Music 来同步歌词";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -281,9 +326,12 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"AudioSync/Preview Content\"";
 				DEVELOPMENT_TEAM = 33K23QULT8;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AudioSync/Info.plist;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "App 需要控制 Music 以获取当前播放状态和歌词同步";
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "需要访问 Apple Music 来同步歌词";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -319,6 +367,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F808FE002DD8B57F0041F8CA /* XCRemoteSwiftPackageReference "Regex" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ddddxxx/Regex";
+			requirement = {
+				branch = master;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F808FE012DD8B57F0041F8CA /* Regex */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F808FE002DD8B57F0041F8CA /* XCRemoteSwiftPackageReference "Regex" */;
+			productName = Regex;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F8F61C812DC097BD007B028F /* Project object */;
 }
