@@ -251,7 +251,7 @@ public class NetworkUtil {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(
-            "Bearer sk-gliblrzjfhukxueioulgpcnnhnbleypfichdulyfzjquidwg",
+            "Bearer your-sk",
             forHTTPHeaderField: "Authorization")
         let payload: [String: Any] = [
             "model": "deepseek-ai/DeepSeek-R1",
