@@ -4,7 +4,8 @@
 
 ## 核心功能
 
-- 🎵 **多源歌词获取**：集成网易云、QQ 音乐等平台，自动匹配并抓取歌词 \r\n
+- 🎵 **多源歌词获取**：集成网易云、QQ 音乐等平台，自动匹配并抓取歌词
+  
   <img width="360" alt="image" src="https://github.com/user-attachments/assets/2f744dce-a968-4adf-be4e-e2be040972b7" />
 - 🧠 **日文歌曲智能还原**：处理片假名/平假名等 J-Pop 曲名，还原正确的原文 (需要调用大模型api，参见fetchOriginalName)
   <img width="862" alt="image" src="https://github.com/user-attachments/assets/3951a77f-f043-4625-89de-bb591b19fd4b" />
