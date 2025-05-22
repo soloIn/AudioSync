@@ -372,7 +372,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 rootView: LyricsSelectorView().environmentObject(self.viewModel!)
             )
             selectorWindow = NSWindow(
-                contentRect: NSRect(x: 0, y: 400, width: 450, height: 400),
+                contentRect: NSRect(x: 0, y: 450, width: 450, height: 450),
                 styleMask: [.borderless],  // 无边框
                 backing: .buffered,
                 defer: false
@@ -383,8 +383,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             selectorWindow.level = .floating  // 后续会修改为前置显示
             // 精确让窗口贴近屏幕底部
             if let screenFrame = NSScreen.main?.visibleFrame {
-                let windowHeight: CGFloat = 400
-                let windowY = screenFrame.minY
+                let windowHeight: CGFloat = 450
+                let windowY = screenFrame.minY+25
                 let windowX = (screenFrame.width - 450) / 2
                 selectorWindow.setFrame(
                     NSRect(

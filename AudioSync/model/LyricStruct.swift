@@ -40,22 +40,22 @@ public struct LyricLine: Decodable, Hashable, Encodable, Equatable {
 
 struct NetEaseSearch: Decodable {
     let result: Result
-    let code: Int
 
     struct Result: Decodable {
         let songs: [Song]
-        let songCount: Int
 
         struct Song: Decodable {
             let name: String
             let id: Int
-            let duration: Int  // milliseconds
-            let album: Album
-            let artists: [Artist]
+            let duration: Int?  // milliseconds
+            let al: Album
+            let ar: [Artist]
         }
 
         struct Album: Decodable {
+            let id: Int
             let name: String
+            let picUrl: String
         }
 
         struct Artist: Decodable {
@@ -110,8 +110,10 @@ struct QQSearch: Decodable {
                 let songmid: String
                 let songname: String
                 let albumname: String
+                let albummid: String
+                let albumid: Int?
                 let singer: [Singer]
-                let interval: Int
+                let interval: Int?
                 struct Pay: Decodable {
                     let payalbum: Int
                     let payalbumprice: Int
@@ -141,7 +143,19 @@ struct QQLyrics: Decodable {
     let lyric: Data
     let trans: Data?
 }
-
+struct QQAlbum: Decodable{
+    let code: Int
+    let data:Album
+    struct Album: Decodable {
+        let album_id:String?
+        let album_mid: String
+        let album_name: String?
+        let headpiclist: [Headpiclist]
+        struct Headpiclist: Decodable{
+            let picurl: String
+        }
+    }
+}
 extension QQLyrics {
 
     var lyricString: String? {

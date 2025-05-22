@@ -20,12 +20,12 @@ struct LyricsSelectorView: View {
                             albumCover.toSwiftUIImage()
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .frame(width: 35, height: 35)
+                                .frame(width: 45, height: 45)
                                 .clipShape(RoundedRectangle(cornerRadius: 4))
                         } else {
                             RoundedRectangle(cornerRadius: 4)
                                 .fill(Color(NSColor.controlAccentColor))
-                                .frame(width: 32, height: 32)
+                                .frame(width: 45, height: 45)
                         }
 
                         // 歌曲名 + 艺人信息
@@ -50,7 +50,7 @@ struct LyricsSelectorView: View {
                             }
                         }) {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(Color.gray.opacity(0.5))
+                                .foregroundColor(Color.green.opacity(0.6))
                                 .imageScale(.large)
                         }
                         .buttonStyle(.plain)
@@ -58,13 +58,15 @@ struct LyricsSelectorView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 5)
+                    .padding(.top, 5)
                 }
                 // 滚动候选项
                 ScrollView(.vertical, showsIndicators: true) {
                     LazyVStack(spacing: 0) {
                         ForEach(viewModel.allCandidates, id: \.id) { song in
                             CandidateRow(song: song, viewModel: viewModel) // 提取子视图
-                                .frame(height: 40) // 固定行高
+                                .frame(height: 42) // 固定行高
+                                .padding(.horizontal)
                             
                             Divider()
                                 .background(Color(NSColor.separatorColor))
@@ -74,7 +76,7 @@ struct LyricsSelectorView: View {
                     .padding(.top, 8)
                 }
             }
-            .frame(width: 450, height: 400) // 固定尺寸
+            .frame(width: 420, height: 450) // 固定尺寸
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color(NSColor.windowBackgroundColor).opacity(0.9))
@@ -93,6 +95,22 @@ struct LyricsSelectorView: View {
         var body: some View {
             Button(action: selectSong) {
                 HStack {
+                    if  !song.albumCover.isEmpty, let url = URL(string: song.albumCover) {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(NSColor.controlAccentColor).opacity(0.3))
+                        }
+                        .frame(width: 40, height: 40)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                    } else {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(NSColor.controlAccentColor))
+                            .frame(width: 40, height:40)
+                    }
                     // 水平滚动文本容器
                     ScrollView(.horizontal, showsIndicators: false) {
                         Text("\(song.name) - \(song.artist) - \(song.album)")
@@ -102,7 +120,7 @@ struct LyricsSelectorView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(height: 40)
+                .frame(height: 42)
                 .background(isHovered ? Color.blue.opacity(0.6) : Color.clear) // 悬停背景
                 .cornerRadius(8)
                 .contentShape(Rectangle()) // 确保整个区域可点击

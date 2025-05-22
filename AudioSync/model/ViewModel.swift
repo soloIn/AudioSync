@@ -255,7 +255,9 @@ struct CandidateSong {
     let name: String
     let artist: String
     let album: String
-    let source: String
+    var albumId: String
+    var albumCover: String
+    let source: LyricsFormat
 }
 
 
