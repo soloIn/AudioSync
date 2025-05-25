@@ -1,10 +1,18 @@
 import CoreAudio
-class AudioFormatManager {
-    var currentFormat: (sampleRate: Int, bitDepth: Int) = (0, 0) {
-        didSet {
-            onFormatUpdate?(currentFormat.sampleRate, currentFormat.bitDepth)
+import Combine
+class AudioFormatManager: ObservableObject {
+    static let shared:AudioFormatManager =  AudioFormatManager()
+    @Published var sampleRate: Int?
+    @Published var bitDepth: Int?
+    
+    var currentFormat: (sampleRate: Int, bitDepth:Int ) = (0,0) {
+            didSet {
+                print("currentFormat change")
+                sampleRate = currentFormat.sampleRate
+                bitDepth = currentFormat.bitDepth
+                onFormatUpdate?(currentFormat.sampleRate, currentFormat.bitDepth)
+            }
         }
-    }
     var onFormatUpdate: ((Int, Int) -> Void)?
 
     // 保持原有日志监控和格式设置逻辑...

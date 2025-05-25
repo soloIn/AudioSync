@@ -15,18 +15,17 @@ import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusBarItem: NSStatusItem!
-    var audioManager = AudioFormatManager()
+    var audioManager = AudioFormatManager.shared
     var updateTimer: Timer?
     var playbackNotifier: PlaybackNotifier?
     var networkUtil: NetworkUtil?
     var viewModel: ViewModel?
-    var karaoKeWindow: NSWindow!
-    var selectorWindow: NSWindow!
     private var cancellables = Set<AnyCancellable>()
     let coreDataContainer: NSPersistentContainer
 
-    @AppStorage("isWindowVisible") var isShowLyric: Bool = false
-
+    @Environment(\.openWindow) private var openWindow
+    @AppStorage("isWindowVisible") var isKaraoke: Bool = false
+    var isFullScreen: Bool = false
     override init() {
         // 使用你的 .xcdatamodeld 文件名（不带扩展）
         self.coreDataContainer = NSPersistentContainer(name: "Lyrics")
@@ -47,28 +46,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
 
         NSApp.setActivationPolicy(.accessory)
-        setupStatusBar()
         playbackNotifier = PlaybackNotifier()
         Task { @MainActor in
             self.viewModel = ViewModel.shared
             self.networkUtil = NetworkUtil(viewModel: self.viewModel!)
-            self.viewModel?.$isPlaying
+            self.viewModel?.$isShowLyrics
                 .removeDuplicates()
-                .sink { playing in
-                    if playing {
-                        self.activateCaraokeView()
-                    } else {
-                        self.deactiveCaraokeView()
-                    }
-                }
-                .store(in: &cancellables)
-            self.viewModel?.$needNanualSelection
-                .removeDuplicates()
-                .sink { manualSelection in
-                    if manualSelection {
-                        self.activateLyricsSelectorView()
-                    } else {
-                        self.deactivateLyricsSelectorView()
+                .sink { [weak self] isShowLyrics in
+                    guard let self = self else { return }
+                    print("监听 isShowLyrics 变化: \(isShowLyrics)")
+                    if isShowLyrics {
+                        playbackNotifier?.scriptNotification()
                     }
                 }
                 .store(in: &cancellables)
@@ -80,6 +68,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 添加播放通知回调逻辑
         playbackNotifier?.onPlay = { [weak self] trackInfo in
+            if let lastTrack = self?.viewModel?.currentTrack?.trackID, lastTrack == trackInfo.trackID{
+                print("歌曲已准备好,跳过处理")
+                return
+            }
             self?.viewModel?.currentTrack = trackInfo
             // 采样率和位深同步
             Task {
@@ -87,7 +79,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.audioManager.onFormatUpdate = {
                     [weak self] sampleRate, bitDepth in
                     self?.audioManager.updateOutputFormat()
-                    self?.updateStatusTitle()
                 }
                 self?.audioManager.startMonitoring()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
@@ -97,76 +88,75 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // 歌词
             Task {
                 print("歌词")
-                self?.viewModel?.isPlaying = false
                 self?.viewModel?.currentlyPlayingLyrics = []
-                if trackInfo.state == "Playing" || trackInfo.state == "playing"
-                {
-                    if self?.isShowLyric == true {
-                        guard let context = self?.coreDataContainer.viewContext
-                        else { return }
+                self?.viewModel?.stopLyricUpdater()
+                if self?.viewModel?.isShowLyrics == true {
+                    guard let context = self?.coreDataContainer.viewContext
+                    else { return }
 
-                        // 先查本地
-                        context.refreshAllObjects()
-                        if let songObject = SongObject.fetchSong(
-                            byID: trackInfo.trackID, context: context)
-                        {
-                            print("songObject: \(songObject)")
-                            let localLyrics = songObject.getLyrics()
-                            if !localLyrics.isEmpty {
-                                print("本地歌词")
-                                self?.viewModel?.currentlyPlayingLyrics =
-                                    localLyrics
-                                self?.viewModel?.currentAlbumColor = trackInfo.color ?? nil
-                                self?.viewModel?.isPlaying = true
-                                return
-                            }
+                    // 先查本地
+                    context.refreshAllObjects()
+                    if let songObject = SongObject.fetchSong(
+                        byID: trackInfo.trackID, context: context)
+                    {
+                        print("songObject: \(songObject)")
+                        let localLyrics = songObject.getLyrics()
+                        if !localLyrics.isEmpty {
+                            print("本地歌词")
+                            self?.viewModel?.currentlyPlayingLyrics =
+                                localLyrics
+                            self?.viewModel?.currentAlbumColor =
+                                trackInfo.color ?? []
+                            self?.viewModel?.startLyricUpdater()
+                            return
                         }
+                    }
 
-                        // 网络歌词
-                        do {
-                            let trackName = trackInfo.name
-                            let artist = trackInfo.artist
+                    // 网络歌词
+                    do {
+                        let trackName = trackInfo.name
+                        let artist = trackInfo.artist
 
-                            if !trackName.isEmpty, !artist.isEmpty {
-                                let lyrics =  try await self?.networkUtil?.fetchLyrics(trackName: trackName, artist: artist, trackID: trackInfo.trackID, album: trackInfo.album, genre: trackInfo.genre)
-
-                                if let lyrics, !lyrics.isEmpty {
-                                    print("网络歌词")
-                                    guard
-                                        let finishLyrics = self?.finishLyric(
-                                            lyrics)
-                                    else {
-                                        print("finishLyrics error")
-                                        return
-                                    }
-                                    self?.viewModel?.currentlyPlayingLyrics =
-                                        finishLyrics
-                                    self?.viewModel?.currentAlbumColor = trackInfo.color ?? nil
-                                    self?.viewModel?.isPlaying = true
-                                    SongObject.saveSong(
-                                        id: trackInfo.trackID,
-                                        trackName: trackName,
-                                        lyrics: finishLyrics, in: context)
+                        if !trackName.isEmpty, !artist.isEmpty {
+                            let lyrics = try await self?.networkUtil?
+                                .fetchLyrics(
+                                    trackName: trackName, artist: artist,
+                                    trackID: trackInfo.trackID,
+                                    album: trackInfo.album,
+                                    genre: trackInfo.genre)
+                            print(lyrics)
+                            if let lyrics, !lyrics.isEmpty {
+                                print("网络歌词")
+                                guard
+                                    let finishLyrics = self?.finishLyric(
+                                        lyrics)
+                                else {
+                                    print("finishLyrics error")
+                                    return
                                 }
-                            } else {
-                                print("原始标题或艺术家为空，跳过歌词请求")
+                                self?.viewModel?.currentlyPlayingLyrics =
+                                    finishLyrics
+                                self?.viewModel?.currentAlbumColor =
+                                    trackInfo.color ?? []
+                                self?.viewModel?.startLyricUpdater()
+                                SongObject.saveSong(
+                                    id: trackInfo.trackID,
+                                    trackName: trackName,
+                                    lyrics: finishLyrics, in: context)
                             }
-                        } catch {
-                            print("网络歌词获取失败: \(error)")
+                        } else {
+                            print("原始标题或艺术家为空，跳过歌词请求")
                         }
-                    } else {
-                        self?.viewModel?.isPlaying = false
-                        self?.viewModel?.currentlyPlayingLyrics = []
+                    } catch {
+                        print("网络歌词获取失败: \(error)")
                     }
                 } else {
-                    self?.viewModel?.isPlaying = false
                     self?.viewModel?.currentlyPlayingLyrics = []
+                    self?.viewModel?.stopLyricUpdater()
                 }
 
             }
         }
-
-        playbackNotifier?.scriptNotification()
     }
     func finishLyric(_ rawLyrics: [LyricLine]) -> [LyricLine] {
         guard let last = rawLyrics.last else { return rawLyrics }
@@ -175,113 +165,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return rawLyrics + [virtualEndLine]
     }
 
-    private func setupStatusBar() {
-        statusBarItem = NSStatusBar.system.statusItem(
-            withLength: NSStatusItem.variableLength)
 
-        let menu = NSMenu()
-        let toggleItem = NSMenuItem(
-            title: "显示歌词", action: #selector(toggleWindow), keyEquivalent: "s")
-        toggleItem.state = isShowLyric ? .on : .off
-        menu.addItem(toggleItem)
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(
-            NSMenuItem(
-                title: "删除本地缓存", action: #selector(delCurrentSongObject),
-                keyEquivalent: "del"))
-        //        menu.addItem(NSMenuItem.separator())
-        menu.addItem(
-            NSMenuItem(
-                title: "剪贴板读取原始歌曲名", action: #selector(manualNamefetch),
-                keyEquivalent: "v"))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(
-            NSMenuItem(
-                title: "退出", action: #selector(NSApplication.terminate(_:)),
-                keyEquivalent: "q"))
-        statusBarItem.menu = menu
 
-        updateStatusTitle()
+
+    @objc private func openSettings() {
+        openWindow(id: "fullScreenLyrics")
     }
 
-    private func updateStatusTitle() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-
-            let sampleRate =
-                Double(self.audioManager.currentFormat.sampleRate) / 1000.0
-            let bit = self.audioManager.currentFormat.bitDepth
-            let title = String(format: "%2d Bit\n%.1fkHz", bit, sampleRate)
-
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.minimumLineHeight = 11
-            paragraphStyle.maximumLineHeight = 11
-
-            let attributes: [NSAttributedString.Key: Any] = [
-                .paragraphStyle: paragraphStyle,
-                .font: NSFont.monospacedDigitSystemFont(
-                    ofSize: 11, weight: .medium),
-                .baselineOffset: -6,
-            ]
-            let attributedTitle = NSAttributedString(
-                string: title, attributes: attributes)
-
-            guard let button = self.statusBarItem.button else { return }
-            button.wantsLayer = true  // 确保启用 layer
-
-            // 滚动动画效果
-            let transition = CATransition()
-            transition.type = .push
-            transition.subtype = .fromTop
-            transition.duration = 0.25
-            transition.timingFunction = CAMediaTimingFunction(
-                name: .easeInEaseOut)
-            button.layer?.add(transition, forKey: "textScroll")
-
-            button.attributedTitle = attributedTitle
-        }
-    }
-
-    private func activateLyricsSelectorView(){
-        if selectorWindow == nil{
-            createLyricsManualView()
-        }
-        selectorWindow.makeKeyAndOrderFront(nil)
-    }
-    private func deactivateLyricsSelectorView(){
-        if selectorWindow != nil{
-            selectorWindow.orderOut(nil)
-        }
-    }
     
-    private func activateCaraokeView() {
-        print("activateCaraokeView")
-        if isShowLyric {
-            if karaoKeWindow == nil {
-                createCaraokeView()
-            }
-            karaoKeWindow.makeKeyAndOrderFront(nil)
-        }
-    }
 
-    private func deactiveCaraokeView() {
-        print("deactiveCaraokeView")
-        if karaoKeWindow != nil {
-            karaoKeWindow.orderOut(nil)
-        }
-    }
-    @MainActor @objc func toggleWindow() {
-        print("isWindowVisible:\(isShowLyric)")
-        isShowLyric.toggle()
-        playbackNotifier?.scriptNotification()
 
-        if let toggleItem = statusBarItem.menu?.items.first(where: {
-            $0.action == #selector(toggleWindow)
-        }) {
-            toggleItem.title = isShowLyric ? "显示歌词" : "显示歌词"
-            toggleItem.state = isShowLyric ? .on : .off
-        }
-    }
 
     @objc func delCurrentSongObject() {
         guard let trackID = playbackNotifier?.fetchCurrentTrack()?.trackID
@@ -294,12 +187,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func manualNamefetch() {
-        Task{
+        Task {
             await manulNameAsyncFetch()
         }
     }
-    
-    private func manulNameAsyncFetch() async{
+
+    private func manulNameAsyncFetch() async {
         do {
             guard let manualName = NSPasteboard.general.string(forType: .string)
             else {
@@ -307,7 +200,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             print("粘贴板: \(manualName)")
-            guard let currentTrack = playbackNotifier?.fetchCurrentTrack() else {
+            guard let currentTrack = playbackNotifier?.fetchCurrentTrack()
+            else {
                 return
             }
 
@@ -334,69 +228,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             print("粘贴板获取歌词失败：\(error)")
         }
     }
-    private func createCaraokeView() {
-        if karaoKeWindow == nil {
-            let contentView = NSHostingView(
-                rootView: KaraokeView().environmentObject(self.viewModel!))
-            // 创建无边框窗口，初步定位到屏幕底部 100 点高度
-            karaoKeWindow = NSWindow(
-                contentRect: NSRect(x: 0, y: 100, width: 800, height: 100),
-                styleMask: [.borderless],  // 无边框
-                backing: .buffered,
-                defer: false
-            )
-
-            karaoKeWindow.contentView = contentView
-            karaoKeWindow.isOpaque = false
-            karaoKeWindow.backgroundColor = .clear
-            karaoKeWindow.level = .floating  // 后续会修改为前置显示
-            // 精确让窗口贴近屏幕底部
-            if let screenFrame = NSScreen.main?.visibleFrame {
-                let windowHeight: CGFloat = 100
-                let windowY = screenFrame.minY
-                let windowX = (screenFrame.width - 800) / 2
-                karaoKeWindow.setFrame(
-                    NSRect(
-                        x: windowX, y: windowY, width: 800, height: windowHeight
-                    ), display: false)
-            }
-            karaoKeWindow.isMovableByWindowBackground = true
-            karaoKeWindow.orderOut(nil)
-        } else {
-            karaoKeWindow.makeKeyAndOrderFront(nil)
-        }
-    }
-    private func createLyricsManualView(){
-        if selectorWindow == nil{
-            let contentView = NSHostingView(
-                rootView: LyricsSelectorView().environmentObject(self.viewModel!)
-            )
-            selectorWindow = NSWindow(
-                contentRect: NSRect(x: 0, y: 450, width: 450, height: 450),
-                styleMask: [.borderless],  // 无边框
-                backing: .buffered,
-                defer: false
-            )
-            selectorWindow.contentView = contentView
-            selectorWindow.isOpaque = false
-            selectorWindow.backgroundColor = .clear
-            selectorWindow.level = .floating  // 后续会修改为前置显示
-            // 精确让窗口贴近屏幕底部
-            if let screenFrame = NSScreen.main?.visibleFrame {
-                let windowHeight: CGFloat = 450
-                let windowY = screenFrame.minY+25
-                let windowX = (screenFrame.width - 450) / 2
-                selectorWindow.setFrame(
-                    NSRect(
-                        x: windowX, y: windowY, width: 450, height: windowHeight
-                    ), display: false)
-            }
-            selectorWindow.isMovableByWindowBackground = true
-            selectorWindow.orderOut(nil)
-        } else {
-            selectorWindow.makeKeyAndOrderFront(nil)
-        }
-    }
+    
 
 }
 

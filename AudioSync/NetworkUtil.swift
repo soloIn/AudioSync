@@ -39,23 +39,26 @@ public class NetworkUtil {
                 newAlbum = origAlbum
             }
         }
-
-        let qqLyrics = await fetchQQLyrics(
-            trackName: newName, artist: newArtist, album: newAlbum)
-        if !qqLyrics.isEmpty {
-            return qqLyrics
-        }
         let neteaseLyrics = await fetchNetEaseLyrics(
             trackName: newName, artist: newArtist, trackID: trackID,
             album: newAlbum)
         if !neteaseLyrics.isEmpty {
             return neteaseLyrics
         }
+        
+        let qqLyrics = await fetchQQLyrics(
+            trackName: newName, artist: newArtist, album: newAlbum)
+        if !qqLyrics.isEmpty {
+            return qqLyrics
+        }
+        
         await fetchAlbumCover()
         
         await MainActor.run {
             if !viewModel.allCandidates.isEmpty {
+                print("needNanualSelection before change \(viewModel.needNanualSelection)")
                 viewModel.needNanualSelection = true
+                print("needNanualSelection changed \(viewModel.needNanualSelection)")
             }
         }
         let selected: CandidateSong = await withCheckedContinuation {
@@ -280,7 +283,7 @@ public class NetworkUtil {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(
-            "Bearer your-sk",
+            "Bearer sk",
             forHTTPHeaderField: "Authorization")
         let payload: [String: Any] = [
             "model": "deepseek-ai/DeepSeek-R1",

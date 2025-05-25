@@ -10,7 +10,7 @@ struct TrackInfo {
     let album: String
     let state: String
     let genre: String
-    let color: NSColor?
+    let color: [NSColor]?
     let albumCover: NSImage?
 }
 
@@ -62,7 +62,7 @@ class PlaybackNotifier {
             album: userInfo["Album"] as? String ?? "",
             state: state,
             genre: userInfo["Genre"] as? String ?? "",
-            color: color.findDominantColor(),
+            color: color.findDominantColors(),
             albumCover: color
         )
 
@@ -99,7 +99,7 @@ class PlaybackNotifier {
             print("appleMusicScript color failed")
             return nil
         }
-        let track = TrackInfo(name: trackInfo.name ?? "", artist: trackInfo.artist ?? "", albumArtist: trackInfo.albumArtist ?? "", trackID: trackInfo.persistentID ?? "", album: trackInfo.album ?? "", state: stringFromPlayerState(state), genre: trackInfo.genre ?? "", color: color.findDominantColor(), albumCover: color)
+        let track = TrackInfo(name: trackInfo.name ?? "", artist: trackInfo.artist ?? "", albumArtist: trackInfo.albumArtist ?? "", trackID: trackInfo.persistentID ?? "", album: trackInfo.album ?? "", state: stringFromPlayerState(state), genre: trackInfo.genre ?? "", color: color.findDominantColors(), albumCover: color)
         return track
     }
 }

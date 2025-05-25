@@ -19,8 +19,9 @@ class ViewModel: ObservableObject {
     @Published var karaokeFont: NSFont = NSFont.boldSystemFont(ofSize: 30)
     @Published var translationExists: Bool = true
     @Published var karaokeShowMultilingual: Bool = true
-    @Published var isPlaying: Bool = false
-    @Published var currentAlbumColor: NSColor? = nil
+    @Published var isShowLyrics: Bool = false
+    @Published var isLyricsPrepared: Bool = false
+    @Published var currentAlbumColor: [NSColor] = []
     @Published var allCandidates: [CandidateSong] = []
     @Published var needNanualSelection: Bool = false
     @Published var currentTrack: TrackInfo?
@@ -31,21 +32,6 @@ class ViewModel: ObservableObject {
     private var currentLyricsUpdaterTask: Task<Void, Error>?
 
     private var cancellables = Set<AnyCancellable>()
-
-    init() {
-        $isPlaying
-            .removeDuplicates()
-            .sink { [weak self] playing in
-                guard let self = self else { return }
-                print("监听 isPlaying 变化: \(playing)")
-                if playing {
-                    self.startLyricUpdater()
-                } else {
-                    self.stopLyricUpdater()
-                }
-            }
-            .store(in: &cancellables)
-    }
 
     private func lyricUpdater() async throws {
         repeat {
@@ -70,7 +56,12 @@ class ViewModel: ObservableObject {
                     currentlyPlayingLyricsIndex = lastIndex - 1
                 }
             }
-            let nextTimestamp = currentlyPlayingLyrics[lastIndex].startTimeMS
+            
+            var nextTimestamp = currentlyPlayingLyrics[lastIndex].startTimeMS
+//            if currentlyPlayingLyrics.indices.contains(lastIndex + 1),
+//               currentlyPlayingLyrics[lastIndex + 1].words.isEmpty {
+//                nextTimestamp = currentlyPlayingLyrics[lastIndex + 1].startTimeMS
+//            }
             let diff = nextTimestamp - currentTime
             print("current time: \(currentTime)")
             print("next time: \(nextTimestamp)")
@@ -84,6 +75,9 @@ class ViewModel: ObservableObject {
             } else {
                 currentlyPlayingLyricsIndex = nil
             }
+            if !isLyricsPrepared && currentlyPlayingLyricsIndex != nil{
+                isLyricsPrepared = true
+            }
             print(
                 "current lyrics index is now \(currentlyPlayingLyricsIndex?.description ?? "nil")"
             )
@@ -93,7 +87,7 @@ class ViewModel: ObservableObject {
     func startLyricUpdater() {
         print("start update task")
         print(
-            "isPlaying: \(self.isPlaying), lyrics.isEmpty: \(currentlyPlayingLyrics.isEmpty)"
+            "isPlaying: \(self.isShowLyrics), lyrics.isEmpty: \(currentlyPlayingLyrics.isEmpty)"
         )
         currentLyricsUpdaterTask?.cancel()
         currentLyricsUpdaterTask = Task {
@@ -107,8 +101,8 @@ class ViewModel: ObservableObject {
 
     func stopLyricUpdater() {
         print("stop update task")
-        isPlaying = false
         currentlyPlayingLyricsIndex = nil
+        isLyricsPrepared = false
         currentLyricsUpdaterTask?.cancel()
     }
 
@@ -144,43 +138,42 @@ class ViewModel: ObservableObject {
         })
     }
     
-    var derivedColor: Color? {
-        guard let color = currentAlbumColor else { return nil }
-        
-        // 将 NSColor 转换为 HSL
-        var hue: CGFloat = 0
-        var saturation: CGFloat = 0
-        var lightness: CGFloat = 0
-        color.getHue(&hue, saturation: &saturation, brightness: &lightness, alpha: nil)
-        
-        // 降低饱和度至 0.2-0.4 区间
-        let adjustedSaturation = saturation * 0.35
-        
-        // 保持亮度在安全区间
-        let safeLightness = max(0.3, min(lightness, 0.7))
-        
-        return Color(
-            hue: hue,
-            saturation: adjustedSaturation,
-            brightness: safeLightness,
-            opacity: 0.6
-        )
-    }
+//    var derivedColor: Color? {
+//        guard let color = currentAlbumColor else { return nil }
+//        
+//        // 将 NSColor 转换为 HSL
+//        var hue: CGFloat = 0
+//        var saturation: CGFloat = 0
+//        var lightness: CGFloat = 0
+//        color.getHue(&hue, saturation: &saturation, brightness: &lightness, alpha: nil)
+//        
+//        // 降低饱和度至 0.2-0.4 区间
+//        let adjustedSaturation = saturation * 0.35
+//        
+//        // 保持亮度在安全区间
+//        let safeLightness = max(0.3, min(lightness, 0.7))
+//        
+//        return Color(
+//            hue: hue,
+//            saturation: adjustedSaturation,
+//            brightness: safeLightness,
+//            opacity: 0.6
+//        )
+//    }
 }
 extension NSImage {
     func toSwiftUIImage() -> Image{
         Image(nsImage: self)
     }
-    func findDominantColor() -> NSColor? {
+    func findDominantColors(maxK: Int = 5) -> [NSColor]? {
         guard let tiffData = self.tiffRepresentation,
               let bitmap = NSBitmapImageRep(data: tiffData),
               let cgImage = bitmap.cgImage else {
             return nil
         }
 
-        // 缩小图像大小以减少计算量（比如 40x40）
-        let size = CGSize(width: 256, height: 256)
-        guard let resizedContext = CGContext(
+        let size = CGSize(width: 64, height: 64)
+        guard let context = CGContext(
             data: nil,
             width: Int(size.width),
             height: Int(size.height),
@@ -189,44 +182,64 @@ extension NSImage {
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else { return nil }
-        
-        resizedContext.interpolationQuality = .high
-        resizedContext.draw(cgImage, in: CGRect(origin: .zero, size: size))
 
-        guard let data = resizedContext.data else { return nil }
+        context.draw(cgImage, in: CGRect(origin: .zero, size: size))
+        guard let data = context.data else { return nil }
         let ptr = data.bindMemory(to: UInt8.self, capacity: Int(size.width * size.height * 4))
 
-        var colorCount: [UInt32: Int] = [:]
+        var points: [(CGFloat, CGFloat, CGFloat)] = []
 
         for x in 0 ..< Int(size.width) {
             for y in 0 ..< Int(size.height) {
                 let offset = 4 * (y * Int(size.width) + x)
-                let r = ptr[offset]
-                let g = ptr[offset + 1]
-                let b = ptr[offset + 2]
-                let a = ptr[offset + 3]
-
-                // 忽略透明像素
-                if a < 128 { continue }
-
-                // 压缩精度（减少颜色数目，便于聚合）
-                let quantR = r >> 3
-                let quantG = g >> 3
-                let quantB = b >> 3
-
-                let rgbKey = UInt32(quantR) << 16 | UInt32(quantG) << 8 | UInt32(quantB)
-                colorCount[rgbKey, default: 0] += 1
+                let r = CGFloat(ptr[offset]) / 255.0
+                let g = CGFloat(ptr[offset + 1]) / 255.0
+                let b = CGFloat(ptr[offset + 2]) / 255.0
+                let a = CGFloat(ptr[offset + 3]) / 255.0
+                if a > 0.5 {
+                    points.append((r, g, b))
+                }
             }
         }
 
-        if let (key, _) = colorCount.max(by: { $0.value < $1.value }) {
-            let r = CGFloat((key >> 16) & 0xFF) / 31.0
-            let g = CGFloat((key >> 8) & 0xFF) / 31.0
-            let b = CGFloat(key & 0xFF) / 31.0
-            return NSColor(red: r, green: g, blue: b, alpha: 1.0)
+        // 自动确定聚类数 k（不超过 maxK）
+        let k = min(maxK, max(1, Int(sqrt(Double(points.count)) / 2)))
+
+        guard points.count >= k else { return nil }
+
+        // 简易 k-means 聚类
+        var centroids = points.shuffled().prefix(k)
+        var clusters: [[(CGFloat, CGFloat, CGFloat)]] = Array(repeating: [], count: k)
+
+        for _ in 0..<10 {
+            clusters = Array(repeating: [], count: k)
+            for point in points {
+                let index = centroids.enumerated().min(by: {
+                    pow($0.1.0 - point.0, 2) + pow($0.1.1 - point.1, 2) + pow($0.1.2 - point.2, 2)
+                    < pow($1.1.0 - point.0, 2) + pow($1.1.1 - point.1, 2) + pow($1.1.2 - point.2, 2)
+                })!.offset
+                clusters[index].append(point)
+            }
+
+            for i in 0..<k {
+                if clusters[i].isEmpty { continue }
+                let sum = clusters[i].reduce((0.0, 0.0, 0.0)) {
+                    ($0.0 + $1.0, $0.1 + $1.1, $0.2 + $1.2)
+                }
+                let count = CGFloat(clusters[i].count)
+                centroids[i] = (sum.0 / count, sum.1 / count, sum.2 / count)
+            }
         }
 
-        return nil
+        // 排序并输出颜色
+        let sorted = clusters.enumerated().sorted { $0.element.count > $1.element.count }
+        return sorted.map {
+            let sum = $0.element.reduce((0.0, 0.0, 0.0)) {
+                ($0.0 + $1.0, $0.1 + $1.1, $0.2 + $1.2)
+            }
+            let count = CGFloat($0.element.count)
+            return NSColor(red: sum.0 / count, green: sum.1 / count, blue: sum.2 / count, alpha: 1.0)
+        }
     }
 }
 
@@ -259,5 +272,3 @@ struct CandidateSong {
     var albumCover: String
     let source: LyricsFormat
 }
-
-
