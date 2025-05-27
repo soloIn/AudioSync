@@ -134,12 +134,16 @@ struct AudioSyncApp: App {
             }
         )
         .onChange(of: audioManager.bitDepth, {
+            #if DEBUG
             print("监听格式: \(audioManager.bitDepth)")
+            #endif
         })
         .onChange(
             of: isFullScreenVisible,
             {
+                #if DEBUG
                 print("isFullScreenVisible change: \(isFullScreenVisible)")
+                #endif
                 viewModel.isShowLyrics = isKaraokeVisible || isFullScreenVisible
                 if isFullScreenVisible {
                     openWindow(id: "fullScreen")
@@ -152,7 +156,9 @@ struct AudioSyncApp: App {
         .onChange(
             of: isKaraokeVisible,
             {
+                #if DEBUG
                 print("isKaraokeVisible change: \(isKaraokeVisible)")
+                #endif
                 viewModel.isShowLyrics = isKaraokeVisible || isFullScreenVisible
                 CreateKaraoke()
             })

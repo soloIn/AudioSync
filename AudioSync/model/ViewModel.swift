@@ -63,11 +63,7 @@ class ViewModel: ObservableObject {
                 }
             }
 
-            var nextTimestamp = currentlyPlayingLyrics[lastIndex].startTimeMS
-            //            if currentlyPlayingLyrics.indices.contains(lastIndex + 1),
-            //               currentlyPlayingLyrics[lastIndex + 1].words.isEmpty {
-            //                nextTimestamp = currentlyPlayingLyrics[lastIndex + 1].startTimeMS
-            //            }
+            let nextTimestamp = currentlyPlayingLyrics[lastIndex].startTimeMS
             let diff = nextTimestamp - currentTime
             #if DEBUG
                 print("current time: \(currentTime)")
@@ -157,28 +153,6 @@ class ViewModel: ObservableObject {
         })
     }
 
-    //    var derivedColor: Color? {
-    //        guard let color = currentAlbumColor else { return nil }
-    //
-    //        // 将 NSColor 转换为 HSL
-    //        var hue: CGFloat = 0
-    //        var saturation: CGFloat = 0
-    //        var lightness: CGFloat = 0
-    //        color.getHue(&hue, saturation: &saturation, brightness: &lightness, alpha: nil)
-    //
-    //        // 降低饱和度至 0.2-0.4 区间
-    //        let adjustedSaturation = saturation * 0.35
-    //
-    //        // 保持亮度在安全区间
-    //        let safeLightness = max(0.3, min(lightness, 0.7))
-    //
-    //        return Color(
-    //            hue: hue,
-    //            saturation: adjustedSaturation,
-    //            brightness: safeLightness,
-    //            opacity: 0.6
-    //        )
-    //    }
 }
 extension NSImage {
     func toSwiftUIImage() -> Image {

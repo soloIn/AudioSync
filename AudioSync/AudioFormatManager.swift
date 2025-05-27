@@ -92,7 +92,9 @@ class AudioFormatManager: ObservableObject {
         do {
             try logProcess?.run()
         } catch {
+            #if DEBUG
             print("AudioFormatManager: Process start error: \(error)")
+            #endif
             DispatchQueue.main.async {
                 self.isMonitoring = false  // 启动失败，重置状态
             }
@@ -170,7 +172,9 @@ class AudioFormatManager: ObservableObject {
         )
 
         if status != noErr {
+            #if DEBUG
             print("Sample rate set failed: \(status)")
+            #endif
         }
     }
 
@@ -217,7 +221,9 @@ class AudioFormatManager: ObservableObject {
     private func setStreamBitDepth(_ depth: Int, for device: AudioDeviceID) {
         // 先获取设备的所有输出流
         guard let streams = getOutputStreams(for: device) else {
+            #if DEBUG
             print("无法获取输出流")
+            #endif
             return
         }
 
@@ -253,7 +259,9 @@ class AudioFormatManager: ObservableObject {
                     "成功设置流 \(stream) 格式：\(format.mBitsPerChannel)bit/\(format.mSampleRate)Hz"
                 )
             } else {
+                #if DEBUG
                 print("设置失败，错误码: \(status)")
+                #endif
             }
         }
     }

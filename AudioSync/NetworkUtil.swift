@@ -27,7 +27,9 @@ public class NetworkUtil {
                 trackName: trackName,
                 artist: artist,
                 album: album)
+            #if DEBUG
             print("日文原始名称: \(originalNameResult)")
+            #endif
             if !originalNameResult.trackName.isEmpty {
                 effectiveTrackName = originalNameResult.trackName
             }
@@ -64,13 +66,17 @@ public class NetworkUtil {
         let shouldAskForManualSelection = await MainActor.run { () -> Bool in
             if !self.viewModel.allCandidates.isEmpty {
                 self.viewModel.needNanualSelection = true
+                #if DEBUG
                 print("needNanualSelection changed to true")
+                #endif
                 return true
             }
             return false
         }
         if shouldAskForManualSelection {
+            #if DEBUG
             print("等待用户手动选择...")
+            #endif
             // 为 continuation 添加超时机制
             let continuationTimeout: TimeInterval = 10.0  // 例如 10 秒超时
 
@@ -83,7 +89,9 @@ public class NetworkUtil {
                                     continuationTimeout * 1_000_000_000))
                             await MainActor.run {
                                 if self.viewModel.onCandidateSelected != nil {
+                                    #if DEBUG
                                     print("手动选择超时。")
+                                    #endif
                                     self.viewModel.onCandidateSelected = nil
                                     self.viewModel.needNanualSelection = false
                                     continuation.resume(
@@ -103,13 +111,17 @@ public class NetworkUtil {
                 // 用户选择后，根据 ID 获取歌词
                 return try await fetchLyricsByID(song: selectedSong)
             } catch FetchError.manualSelectionTimeout {
+                #if DEBUG
                 print("手动选择超时，未获取到歌词。")
+                #endif
                 await MainActor.run {
                     self.viewModel.needNanualSelection = false  // 确保UI状态被重置
                 }
                 return []  // 或抛出错误
             } catch {
+                #if DEBUG
                 print("手动选择过程中发生错误: \(error)")
+                #endif
                 await MainActor.run {
                     self.viewModel.needNanualSelection = false  // 确保UI状态被重置
                 }
@@ -140,7 +152,9 @@ public class NetworkUtil {
                         for: request)
                 let neteasesearch = try decoder.decode(
                     NetEaseSearch.self, from: urlResponseAndData.0)
+                #if DEBUG
                 print("netease 搜索歌曲：\(neteasesearch.result.songs)")
+                #endif
 
                 let matchedSong = neteasesearch.result.songs.first {
                     $0.name.normalized == trackName.normalized
@@ -211,7 +225,9 @@ public class NetworkUtil {
                 }
                 return finalLyrics
             } catch {
+                #if DEBUG
                 print("fetch netease lyrics:\(error)")
+                #endif
             }
         }
         return []
@@ -244,9 +260,13 @@ public class NetworkUtil {
                 }
                 let QQSearchData = try decoder.decode(
                     QQSearch.self, from: jsonData)
+                #if DEBUG
                 print("qq 搜索歌曲:\(QQSearchData.data.song.list)")
+                #endif
                 if QQSearchData.data.song.list.isEmpty {
+                    #if DEBUG
                     print(url.absoluteString)
+                    #endif
                 }
                 let QQSong = QQSearchData.data.song.list.first {
                     $0.songname.normalized == trackName.normalized
@@ -321,10 +341,14 @@ public class NetworkUtil {
                         lyrics: tlyricString, format: .qq)
                     return lyricsParser.mergeLyrics(translation: tlyricsParser)
                 }
+                #if DEBUG
                 print("qq lyricParse \(lyricsParser.lyrics)")
+                #endif
                 return lyricsParser.lyrics
             } catch {
+                #if DEBUG
                 print("fetch qq lyrics : \(error)")
+                #endif
             }
         }
         return []
@@ -443,12 +467,16 @@ public class NetworkUtil {
             }
             let lyricsParser = LyricsParser(lyrics: lyricString, format: .qq)
             if let tlyricString = qqLyricsData.transString {
+                #if DEBUG
                 print("qq lyricString:\(tlyricString)")
+                #endif
                 let tlyricsParser = LyricsParser(
                     lyrics: tlyricString, format: .qq)
                 return lyricsParser.mergeLyrics(translation: tlyricsParser)
             }
+            #if DEBUG
             print("qq lyricParse \(lyricsParser.lyrics)")
+            #endif
             return lyricsParser.lyrics
         }
     }
@@ -468,7 +496,11 @@ public class NetworkUtil {
             return qqCandidates
         }
 
+        #if DEBUG
+
         print("QQ封面ID：\(qq)")
+
+        #endif
 
         await withTaskGroup(of: (String, String).self) { group in
             for id in qq {
@@ -505,16 +537,24 @@ public class NetworkUtil {
             let albumData = try await fakeSpotifyUserAgentSession.data(
                 for: albumRequest)
             let album = try decoder.decode(QQAlbum.self, from: albumData.0)
+            #if DEBUG
             print("album:\(album)")
+            #endif
             guard let pic = album.data.headpiclist.first?.picurl else {
+                #if DEBUG
                 print("专辑封面获取失败: \(album)")
+                #endif
                 return ""
             }
+            #if DEBUG
             print("\(id) url: \(pic) ")
+            #endif
             return pic
 
         } catch {
+            #if DEBUG
             print(error)
+            #endif
         }
         return ""
     }

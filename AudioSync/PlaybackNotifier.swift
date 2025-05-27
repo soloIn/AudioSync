@@ -68,7 +68,11 @@ class PlaybackNotifier {
             albumCover: artworkData
         )
 
+        #if DEBUG
+
         print("appleNotification：\(trackInfo)")
+
+        #endif
         onPlay?(trackInfo)
     }
 
@@ -77,7 +81,11 @@ class PlaybackNotifier {
             return
         }
 
+        #if DEBUG
+
         print("scriptNotification: \(track)")
+
+        #endif
         onPlay?(track)
     }
     func stringFromPlayerState(_ state: MusicEPlS) -> String {
@@ -96,7 +104,9 @@ class PlaybackNotifier {
             let artworkData =
                 (trackInfo.artworks?().firstObject as? MusicArtwork)?.data
         else {  // 安全访问 playerState
+            #if DEBUG
             print("appleMusicScript: Failed to retrieve current track")
+            #endif
             return nil
         }
 

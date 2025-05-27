@@ -21,7 +21,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @ObservedObject var viewModel: ViewModel = ViewModel.shared
     private var cancellables = Set<AnyCancellable>()
     let coreDataContainer: NSPersistentContainer
-    
+
     override init() {
         // 使用你的 .xcdatamodeld 文件名（不带扩展）
         self.coreDataContainer = NSPersistentContainer(name: "Lyrics")
@@ -30,7 +30,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if let error = error {
                 fatalError("❌ CoreData 加载失败: \(error)")
             } else {
-                print("✅ CoreData 加载成功: \(description)")
+                #if DEBUG
+                    print("✅ CoreData 加载成功: \(description)")
+                #endif
             }
         }
         coreDataContainer.viewContext.automaticallyMergesChangesFromParent =
@@ -49,7 +51,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 .removeDuplicates()
                 .sink { [weak self] isShowLyrics in
                     guard let self = self else { return }
-                    print("监听 isShowLyrics 变化: \(isShowLyrics)")
+                    #if DEBUG
+                        print("监听 isShowLyrics 变化: \(isShowLyrics)")
+                    #endif
                     if isShowLyrics {
                         playbackNotifier?.scriptNotification()
                     } else {
@@ -65,10 +69,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 添加播放通知回调逻辑
         playbackNotifier?.onPlay = { [weak self] trackInfo in
-            if let lastTrack = self?.viewModel.currentTrack?.trackID, lastTrack == trackInfo.trackID,
-               self?.viewModel.currentlyPlayingLyrics.isEmpty != true{
+            if let lastTrack = self?.viewModel.currentTrack?.trackID,
+                lastTrack == trackInfo.trackID,
+                self?.viewModel.currentlyPlayingLyrics.isEmpty != true
+            {
                 self?.viewModel.startLyricUpdater()
-                print("歌曲已准备好,跳过处理")
+                #if DEBUG
+                    print("歌曲已准备好,跳过处理")
+                #endif
                 return
             }
             self?.viewModel.currentTrack = trackInfo
@@ -86,7 +94,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             // 歌词
             Task {
-                print("歌词")
+                #if DEBUG
+                    print("歌词")
+                #endif
                 self?.viewModel.currentlyPlayingLyrics = []
                 self?.viewModel.stopLyricUpdater()
                 if self?.viewModel.isShowLyrics == true {
@@ -98,10 +108,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     if let songObject = SongObject.fetchSong(
                         byID: trackInfo.trackID, context: context)
                     {
-                        print("songObject: \(songObject)")
+                        #if DEBUG
+                            print("songObject: \(songObject)")
+                        #endif
                         let localLyrics = songObject.getLyrics()
                         if !localLyrics.isEmpty {
-                            print("本地歌词")
+                            #if DEBUG
+                                print("本地歌词")
+                            #endif
                             self?.viewModel.currentlyPlayingLyrics =
                                 localLyrics
                             self?.viewModel.currentAlbumColor =
@@ -124,12 +138,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                     album: trackInfo.album,
                                     genre: trackInfo.genre)
                             if let lyrics, !lyrics.isEmpty {
-                                print("网络歌词")
+                                #if DEBUG
+                                    print("网络歌词")
+                                #endif
                                 guard
                                     let finishLyrics = self?.finishLyric(
                                         lyrics)
                                 else {
-                                    print("finishLyrics error")
+                                    #if DEBUG
+                                        print("finishLyrics error")
+                                    #endif
                                     return
                                 }
                                 self?.viewModel.currentlyPlayingLyrics =
@@ -143,12 +161,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                     lyrics: finishLyrics, in: context)
                             }
                         } else {
-                            print("原始标题或艺术家为空，跳过歌词请求")
+                            #if DEBUG
+                                print("原始标题或艺术家为空，跳过歌词请求")
+                            #endif
                         }
                     } catch {
-                        print("网络歌词获取失败: \(error)")
+                        #if DEBUG
+                            print("网络歌词获取失败: \(error)")
+                        #endif
                     }
-                } 
+                }
 
             }
         }
@@ -159,8 +181,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             startTime: last.startTimeMS + 5000, words: "")
         return rawLyrics + [virtualEndLine]
     }
-
-
 
     @objc func delCurrentSongObject() {
         guard let trackID = playbackNotifier?.fetchCurrentTrack()?.trackID
@@ -182,10 +202,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             guard let manualName = NSPasteboard.general.string(forType: .string)
             else {
-                print("⚠️ 粘贴板中没有字符串内容")
+                #if DEBUG
+                    print("⚠️ 粘贴板中没有字符串内容")
+                #endif
                 return
             }
-            print("粘贴板: \(manualName)")
+            #if DEBUG
+                print("粘贴板: \(manualName)")
+            #endif
             guard let currentTrack = playbackNotifier?.fetchCurrentTrack()
             else {
                 return
@@ -211,10 +235,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
         } catch {
-            print("粘贴板获取歌词失败：\(error)")
+            #if DEBUG
+                print("粘贴板获取歌词失败：\(error)")
+            #endif
         }
     }
-    
 
 }
 
