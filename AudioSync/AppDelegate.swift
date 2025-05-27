@@ -16,16 +16,12 @@ import SwiftUI
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusBarItem: NSStatusItem!
     var audioManager = AudioFormatManager.shared
-    var updateTimer: Timer?
     var playbackNotifier: PlaybackNotifier?
     var networkUtil: NetworkUtil?
-    var viewModel: ViewModel?
+    @ObservedObject var viewModel: ViewModel = ViewModel.shared
     private var cancellables = Set<AnyCancellable>()
     let coreDataContainer: NSPersistentContainer
-
-    @Environment(\.openWindow) private var openWindow
-    @AppStorage("isWindowVisible") var isKaraoke: Bool = false
-    var isFullScreen: Bool = false
+    
     override init() {
         // 使用你的 .xcdatamodeld 文件名（不带扩展）
         self.coreDataContainer = NSPersistentContainer(name: "Lyrics")
@@ -48,15 +44,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         playbackNotifier = PlaybackNotifier()
         Task { @MainActor in
-            self.viewModel = ViewModel.shared
-            self.networkUtil = NetworkUtil(viewModel: self.viewModel!)
-            self.viewModel?.$isShowLyrics
+            self.networkUtil = NetworkUtil(viewModel: self.viewModel)
+            self.viewModel.$isShowLyrics
                 .removeDuplicates()
                 .sink { [weak self] isShowLyrics in
                     guard let self = self else { return }
                     print("监听 isShowLyrics 变化: \(isShowLyrics)")
                     if isShowLyrics {
                         playbackNotifier?.scriptNotification()
+                    } else {
+                        viewModel.stopLyricUpdater()
                     }
                 }
                 .store(in: &cancellables)
@@ -68,11 +65,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 添加播放通知回调逻辑
         playbackNotifier?.onPlay = { [weak self] trackInfo in
-            if let lastTrack = self?.viewModel?.currentTrack?.trackID, lastTrack == trackInfo.trackID{
+            if let lastTrack = self?.viewModel.currentTrack?.trackID, lastTrack == trackInfo.trackID,
+               self?.viewModel.currentlyPlayingLyrics.isEmpty != true{
+                self?.viewModel.startLyricUpdater()
                 print("歌曲已准备好,跳过处理")
                 return
             }
-            self?.viewModel?.currentTrack = trackInfo
+            self?.viewModel.currentTrack = trackInfo
             // 采样率和位深同步
             Task {
                 guard trackInfo.state == "Playing" else { return }
@@ -88,9 +87,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // 歌词
             Task {
                 print("歌词")
-                self?.viewModel?.currentlyPlayingLyrics = []
-                self?.viewModel?.stopLyricUpdater()
-                if self?.viewModel?.isShowLyrics == true {
+                self?.viewModel.currentlyPlayingLyrics = []
+                self?.viewModel.stopLyricUpdater()
+                if self?.viewModel.isShowLyrics == true {
                     guard let context = self?.coreDataContainer.viewContext
                     else { return }
 
@@ -103,11 +102,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         let localLyrics = songObject.getLyrics()
                         if !localLyrics.isEmpty {
                             print("本地歌词")
-                            self?.viewModel?.currentlyPlayingLyrics =
+                            self?.viewModel.currentlyPlayingLyrics =
                                 localLyrics
-                            self?.viewModel?.currentAlbumColor =
+                            self?.viewModel.currentAlbumColor =
                                 trackInfo.color ?? []
-                            self?.viewModel?.startLyricUpdater()
+                            self?.viewModel.startLyricUpdater()
                             return
                         }
                     }
@@ -124,7 +123,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                     trackID: trackInfo.trackID,
                                     album: trackInfo.album,
                                     genre: trackInfo.genre)
-                            print(lyrics)
                             if let lyrics, !lyrics.isEmpty {
                                 print("网络歌词")
                                 guard
@@ -134,11 +132,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                     print("finishLyrics error")
                                     return
                                 }
-                                self?.viewModel?.currentlyPlayingLyrics =
+                                self?.viewModel.currentlyPlayingLyrics =
                                     finishLyrics
-                                self?.viewModel?.currentAlbumColor =
+                                self?.viewModel.currentAlbumColor =
                                     trackInfo.color ?? []
-                                self?.viewModel?.startLyricUpdater()
+                                self?.viewModel.startLyricUpdater()
                                 SongObject.saveSong(
                                     id: trackInfo.trackID,
                                     trackName: trackName,
@@ -150,10 +148,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     } catch {
                         print("网络歌词获取失败: \(error)")
                     }
-                } else {
-                    self?.viewModel?.currentlyPlayingLyrics = []
-                    self?.viewModel?.stopLyricUpdater()
-                }
+                } 
 
             }
         }
@@ -164,15 +159,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             startTime: last.startTimeMS + 5000, words: "")
         return rawLyrics + [virtualEndLine]
     }
-
-
-
-
-    @objc private func openSettings() {
-        openWindow(id: "fullScreenLyrics")
-    }
-
-    
 
 
 

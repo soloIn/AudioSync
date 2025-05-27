@@ -156,10 +156,7 @@ struct AudioSyncApp: App {
                 viewModel.isShowLyrics = isKaraokeVisible || isFullScreenVisible
                 CreateKaraoke()
             })
-        .onChange(of: viewModel.isLyricsPrepared, {
-            print("isLyricsPrepared change: \(viewModel.isLyricsPrepared)")
-            CreateKaraoke()
-        })
+        
         
         WindowGroup("fullScreenLyrics", id: "fullScreen") {
             FullScreenView().environmentObject(viewModel)

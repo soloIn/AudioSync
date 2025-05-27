@@ -17,60 +17,113 @@ public class NetworkUtil {
     ) async throws -> [LyricLine] {
         await MainActor.run {
             viewModel.allCandidates.removeAll()
+            viewModel.needNanualSelection = false
         }
-        var newName = trackName
-        var newArtist = artist
-        var newAlbum = album
+        var effectiveTrackName = trackName
+        var effectiveArtist = artist
+        var effectiveAlbum = album
         if ["J-Pop", "Kayokyoku", "J-Rock"].contains(genre) {
-            let originalName = try await fetchOriginalName(
+            let originalNameResult = try await fetchOriginalName(
                 trackName: trackName,
                 artist: artist,
                 album: album)
-            print("日文原始名称: \(originalName)")
-            let origTrackName = originalName.trackName
-            let origArtist = originalName.artist
-            let origAlbum = originalName.album
-            if !origTrackName.isEmpty,
-                !origArtist.isEmpty,
-                !origAlbum.isEmpty
-            {
-                newName = origTrackName
-                newArtist = origArtist
-                newAlbum = origAlbum
+            print("日文原始名称: \(originalNameResult)")
+            if !originalNameResult.trackName.isEmpty {
+                effectiveTrackName = originalNameResult.trackName
+            }
+            if !originalNameResult.artist.isEmpty {
+                effectiveArtist = originalNameResult.artist
+            }
+            if !originalNameResult.album.isEmpty {
+                effectiveAlbum = originalNameResult.album
             }
         }
-        let neteaseLyrics = await fetchNetEaseLyrics(
-            trackName: newName, artist: newArtist, trackID: trackID,
-            album: newAlbum)
-        if !neteaseLyrics.isEmpty {
-            return neteaseLyrics
+        // 尝试网易云音乐
+        var lyrics = await fetchNetEaseLyrics(
+            trackName: effectiveTrackName, artist: effectiveArtist,
+            trackID: trackID,  // trackID 似乎未使用，但保持签名一致
+            album: effectiveAlbum)
+        if !lyrics.isEmpty {
+            return lyrics
         }
-        
-        let qqLyrics = await fetchQQLyrics(
-            trackName: newName, artist: newArtist, album: newAlbum)
-        if !qqLyrics.isEmpty {
-            return qqLyrics
+
+        // 尝试 QQ 音乐
+        lyrics = await fetchQQLyrics(
+            trackName: effectiveTrackName, artist: effectiveArtist,
+            album: effectiveAlbum)
+        if !lyrics.isEmpty {
+            return lyrics
         }
-        
+
+        // 如果上述都失败，并且收集到了候选歌曲，则触发手动选择
+        // 先获取QQ音乐的封面
         await fetchAlbumCover()
-        
-        await MainActor.run {
-            if !viewModel.allCandidates.isEmpty {
-                print("needNanualSelection before change \(viewModel.needNanualSelection)")
-                viewModel.needNanualSelection = true
-                print("needNanualSelection changed \(viewModel.needNanualSelection)")
+
+        // 检查是否有候选歌曲，并触发手动选择流程
+        // 在 MainActor 上更新 UI 相关状态
+        let shouldAskForManualSelection = await MainActor.run { () -> Bool in
+            if !self.viewModel.allCandidates.isEmpty {
+                self.viewModel.needNanualSelection = true
+                print("needNanualSelection changed to true")
+                return true
             }
+            return false
         }
-        let selected: CandidateSong = await withCheckedContinuation {
-            continuation in
-            Task { @MainActor in
-                viewModel.onCandidateSelected = { song in
-                    continuation.resume(returning: song)
-                    self.viewModel.onCandidateSelected = nil
+        if shouldAskForManualSelection {
+            print("等待用户手动选择...")
+            // 为 continuation 添加超时机制
+            let continuationTimeout: TimeInterval = 10.0  // 例如 10 秒超时
+
+            do {
+                let selectedSong: CandidateSong =
+                    try await withCheckedThrowingContinuation { continuation in
+                        Task {
+                            try? await Task.sleep(
+                                nanoseconds: UInt64(
+                                    continuationTimeout * 1_000_000_000))
+                            await MainActor.run {
+                                if self.viewModel.onCandidateSelected != nil {
+                                    print("手动选择超时。")
+                                    self.viewModel.onCandidateSelected = nil
+                                    self.viewModel.needNanualSelection = false
+                                    continuation.resume(
+                                        throwing: FetchError
+                                            .manualSelectionTimeout)
+                                }
+                            }
+                        }
+
+                        Task { @MainActor in
+                            self.viewModel.onCandidateSelected = { song in
+                                self.viewModel.onCandidateSelected = nil  // 清理回调
+                                continuation.resume(returning: song)
+                            }
+                        }
+                    }
+                // 用户选择后，根据 ID 获取歌词
+                return try await fetchLyricsByID(song: selectedSong)
+            } catch FetchError.manualSelectionTimeout {
+                print("手动选择超时，未获取到歌词。")
+                await MainActor.run {
+                    self.viewModel.needNanualSelection = false  // 确保UI状态被重置
                 }
+                return []  // 或抛出错误
+            } catch {
+                print("手动选择过程中发生错误: \(error)")
+                await MainActor.run {
+                    self.viewModel.needNanualSelection = false  // 确保UI状态被重置
+                }
+                throw error  // 重新抛出其他错误
             }
         }
-        return try await fetchLyricsByID(song: selected)
+        return []
+    }
+
+    // 定义一个错误类型用于超时
+    enum FetchError: Error {
+        case manualSelectionTimeout
+        case apiError(String)
+        case parsingError(String)
     }
 
     func fetchNetEaseLyrics(
@@ -88,18 +141,16 @@ public class NetworkUtil {
                 let neteasesearch = try decoder.decode(
                     NetEaseSearch.self, from: urlResponseAndData.0)
                 print("netease 搜索歌曲：\(neteasesearch.result.songs)")
-                if neteasesearch.result.songs.isEmpty {
-                    print(url.absoluteString)
-                }
+
                 let matchedSong = neteasesearch.result.songs.first {
                     $0.name.normalized == trackName.normalized
-                    && $0.ar.contains(where: {
-                        $0.name.normalized == artist.normalized
+                        && $0.ar.contains(where: {
+                            $0.name.normalized == artist.normalized
                         })
-                    && ($0.al.name.normalized == album.normalized
-                        || album.normalized.contains(
-                            $0.al.name.normalized)
-                        || $0.al.name.normalized.contains(
+                        && ($0.al.name.normalized == album.normalized
+                            || album.normalized.contains(
+                                $0.al.name.normalized)
+                            || $0.al.name.normalized.contains(
                                 album.normalized))
                 }
 
@@ -145,16 +196,20 @@ public class NetworkUtil {
 
                 let originalParser = LyricsParser(
                     lyrics: neteaseLrcString, format: .netEase)
+                var finalLyrics = originalParser.lyrics
 
-                guard let tlrc = neteaseLyrics.tlyric,
-                    let tlrcString = tlrc.lyric
-                else {
-                    return originalParser.lyrics
+                // 合并歌词翻译
+                if let tlyric = neteaseLyrics.tlyric,
+                    let tlyricString = tlyric.lyric, !tlyricString.isEmpty
+                {
+                    let translationParser = LyricsParser(
+                        lyrics: tlyricString, format: .netEase)
+                    if !translationParser.lyrics.isEmpty {
+                        finalLyrics = originalParser.mergeLyrics(
+                            translation: translationParser)
+                    }
                 }
-                let translationParser = LyricsParser(
-                    lyrics: tlrcString, format: .netEase)
-                return originalParser.mergeLyrics(
-                    translation: translationParser)
+                return finalLyrics
             } catch {
                 print("fetch netease lyrics:\(error)")
             }
@@ -283,7 +338,7 @@ public class NetworkUtil {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(
-            "Bearer sk",
+            "Bearer sk-gliblrzjfhukxueioulgpcnnhnbleypfichdulyfzjquidwg",
             forHTTPHeaderField: "Authorization")
         let payload: [String: Any] = [
             "model": "deepseek-ai/DeepSeek-R1",
@@ -403,7 +458,7 @@ public class NetworkUtil {
             for candidate in viewModel.allCandidates {
                 switch candidate.source {
                 case .qq:
-                    if !candidate.albumId.isEmpty{
+                    if !candidate.albumId.isEmpty {
                         qqCandidates.append(candidate.albumId)
                     }
                 case .netEase:
@@ -418,27 +473,37 @@ public class NetworkUtil {
         await withTaskGroup(of: (String, String).self) { group in
             for id in qq {
                 group.addTask {
-                    let cover = (try? await self.fetchQQAlbumCoverByID(id: id)) ?? ""
+                    let cover =
+                        (try? await self.fetchQQAlbumCoverByID(id: id)) ?? ""
                     return (id, cover)
                 }
             }
 
-            let coverMap = await group.reduce(into: [String: String]()) { $0[$1.0] = $1.1 }
+            let coverMap = await group.reduce(into: [String: String]()) {
+                $0[$1.0] = $1.1
+            }
 
             await MainActor.run {
                 for i in 0..<viewModel.allCandidates.count {
                     let candidate = viewModel.allCandidates[i]
-                    if candidate.source == .qq, let cover = coverMap[candidate.albumId] {
+                    if candidate.source == .qq,
+                        let cover = coverMap[candidate.albumId]
+                    {
                         viewModel.allCandidates[i].albumCover = cover
                     }
                 }
             }
         }
     }
-    func fetchQQAlbumCoverByID(id: String) async throws -> String{
-        do{
-            let albumRequest = URLRequest(url: URL(string: "https://c.y.qq.com/v8/fcg-bin/musicmall.fcg?albummid=\(id)&format=json&inCharset=utf-8&outCharset=utf-8&cmd=get_album_buy_page")!)
-            let albumData = try await fakeSpotifyUserAgentSession.data(for: albumRequest)
+    func fetchQQAlbumCoverByID(id: String) async throws -> String {
+        do {
+            let albumRequest = URLRequest(
+                url: URL(
+                    string:
+                        "https://c.y.qq.com/v8/fcg-bin/musicmall.fcg?albummid=\(id)&format=json&inCharset=utf-8&outCharset=utf-8&cmd=get_album_buy_page"
+                )!)
+            let albumData = try await fakeSpotifyUserAgentSession.data(
+                for: albumRequest)
             let album = try decoder.decode(QQAlbum.self, from: albumData.0)
             print("album:\(album)")
             guard let pic = album.data.headpiclist.first?.picurl else {
@@ -458,13 +523,12 @@ public class NetworkUtil {
 extension String {
     var normalized: String {
         self
-            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: "(", with: "-")
             .replacingOccurrences(of: ")", with: "-")
             .replacingOccurrences(of: "：", with: "-")
             .replacingOccurrences(of: "（", with: "-")
             .replacingOccurrences(of: "）", with: "-")
-            .replacingOccurrences(of: "  ", with: "")
             .lowercased()
     }
 }

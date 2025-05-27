@@ -1,6 +1,6 @@
+import AppKit
 import CoreAudio
 import ScriptingBridge
-import AppKit
 
 struct TrackInfo {
     let name: String
@@ -16,8 +16,8 @@ struct TrackInfo {
 
 class PlaybackNotifier {
     var onPlay: ((TrackInfo) -> Void)?
-    
-    var appleMusicScript: MusicApplication? = SBApplication(
+
+    private lazy var appleMusicScript: MusicApplication? = SBApplication(
         bundleIdentifier: "com.apple.Music")
 
     init() {
@@ -33,25 +33,27 @@ class PlaybackNotifier {
         DistributedNotificationCenter.default().removeObserver(self)
     }
 
-    @objc private func receivedPlaybackNotification(_ notification: Notification) {
-        guard let userInfo = notification.userInfo else {
+    @objc private func receivedPlaybackNotification(
+        _ notification: Notification
+    ) {
+        guard let userInfo = notification.userInfo,
+            let name = userInfo["Name"] as? String,
+            let state = userInfo["Player State"] as? String
+        else {
+            print(
+                "appleNotification:  userInfo is missing required fields.")
             return
         }
-        
-        guard let name = userInfo["Name"] as? String,
-              let state = userInfo["Player State"] as? String else {
-            return
-        }
-        guard let currentTrack = appleMusicScript?.currentTrack else {
-            print("appleMusicScript currentTrack failed")
-            return
-        }
-        guard let persistentID = currentTrack.persistentID else {
-            print("appleMusicScript persistentID failed")
-            return
-        }
-        guard let color =  (currentTrack.artworks?().firstObject as? MusicArtwork)?.data else {
-            print("appleMusicScript color failed")
+
+        guard let script = appleMusicScript,
+            let currentTrack = script.currentTrack,  // 首先确保 currentTrack 存在
+            let persistentID = currentTrack.persistentID,  // 然后安全地访问其属性
+            let artworkData =
+                (currentTrack.artworks?().firstObject as? MusicArtwork)?.data
+        else {
+            print(
+                "appleMusicScript: Failed to retrieve complete track information "
+            )
             return
         }
         let trackInfo = TrackInfo(
@@ -62,19 +64,19 @@ class PlaybackNotifier {
             album: userInfo["Album"] as? String ?? "",
             state: state,
             genre: userInfo["Genre"] as? String ?? "",
-            color: color.findDominantColors(),
-            albumCover: color
+            color: artworkData.findDominantColors(),
+            albumCover: artworkData
         )
 
         print("appleNotification：\(trackInfo)")
         onPlay?(trackInfo)
     }
-    
-    func scriptNotification(){
-        guard let track = fetchCurrentTrack() else{
+
+    func scriptNotification() {
+        guard let track = fetchCurrentTrack() else {
             return
         }
-        
+
         print("scriptNotification: \(track)")
         onPlay?(track)
     }
@@ -86,21 +88,24 @@ class PlaybackNotifier {
         default: return "unknown(\(state.rawValue))"
         }
     }
-    func fetchCurrentTrack() -> TrackInfo?{
-        guard let trackInfo = appleMusicScript?.currentTrack else {
-            print("appleMusicScript currentTrack failed")
+    func fetchCurrentTrack() -> TrackInfo? {
+        guard let script = appleMusicScript,  // 确保 appleMusicScript 存在
+            let trackInfo = script.currentTrack,  // 确保 currentTrack 存在
+            let persistentID = trackInfo.persistentID,  // 安全访问 persistentID
+            let state = script.playerState,
+            let artworkData =
+                (trackInfo.artworks?().firstObject as? MusicArtwork)?.data
+        else {  // 安全访问 playerState
+            print("appleMusicScript: Failed to retrieve current track")
             return nil
         }
-        guard let state = appleMusicScript?.playerState  else {
-            print("appleMusicScript playerState failed")
-            return nil
-        }
-        guard let color =  (trackInfo.artworks?().firstObject as? MusicArtwork)?.data else {
-            print("appleMusicScript color failed")
-            return nil
-        }
-        let track = TrackInfo(name: trackInfo.name ?? "", artist: trackInfo.artist ?? "", albumArtist: trackInfo.albumArtist ?? "", trackID: trackInfo.persistentID ?? "", album: trackInfo.album ?? "", state: stringFromPlayerState(state), genre: trackInfo.genre ?? "", color: color.findDominantColors(), albumCover: color)
+
+        let track = TrackInfo(
+            name: trackInfo.name ?? "", artist: trackInfo.artist ?? "",
+            albumArtist: trackInfo.albumArtist ?? "",
+            trackID: trackInfo.persistentID ?? "", album: trackInfo.album ?? "",
+            state: stringFromPlayerState(state), genre: trackInfo.genre ?? "",
+            color: artworkData.findDominantColors(), albumCover: artworkData)
         return track
     }
 }
-

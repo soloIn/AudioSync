@@ -14,7 +14,7 @@ struct FullScreenView: View {
         ZStack {
             AnimatedMeshGradientView(
                 colors: viewmodel.currentAlbumColor.map { Color($0) })
-            .overlay(Color.black.opacity(0.2))
+            .overlay(Color.black.opacity(0.3))
             GeometryReader { geo in
                 HStack {
                     albumArt
@@ -35,7 +35,7 @@ struct FullScreenView: View {
     }
 
     var canDisplayLyrics: Bool {
-        viewmodel.isShowLyrics && viewmodel.isLyricsPrepared
+        viewmodel.isShowLyrics
     }
 
     @ViewBuilder func lyricLineView(for element: LyricLine, index: Int)
@@ -47,16 +47,15 @@ struct FullScreenView: View {
                 !trlycs.isEmpty
             {
                 Text(verbatim: trlycs)
-                    .font(
-                        .custom(
-                            viewmodel.karaokeFont.fontName,
-                            size: 0.9 * (viewmodel.karaokeFont.pointSize))
-                    )
-                    
             }
         }
         .foregroundStyle(
             .white
+        )
+        .font(
+            .custom(
+                viewmodel.karaokeFont.fontName,
+                size: 38)
         )
 }
 
@@ -73,16 +72,7 @@ struct FullScreenView: View {
                             id: \.element
                         ) { offset, element in
                             lyricLineView(for: element, index: offset)
-                                .opacity(
-                                    offset == viewmodel.currentlyPlayingLyrics
-                                        .count - 1 ? 0 : 1
-                                )
-                                .font(
-                                    .system(
-                                        size: 40, weight: .bold,
-                                        design: .default)
-                                )
-                                .padding(20)
+                                .padding(10)
                                 .opacity(
                                     offset == viewmodel.currentlyPlayingLyrics
                                         .count - 1
@@ -95,21 +85,19 @@ struct FullScreenView: View {
                                 )
                                 // 添加透明度变化的平滑过渡
                                 .animation(
-                                    .easeInOut(duration: 0.2),
+                                    .smooth(duration: 0.2),
                                     value: viewmodel.currentlyPlayingLyricsIndex
                                 )
-//                                // 为位置变化添加弹性动画
-//                                .animation(
-//                                    .interactiveSpring(
-//                                        response: 0.3, dampingFraction: 0.6),
-//                                    value: viewmodel.currentlyPlayingLyricsIndex
-//                                )
+                                // 为位置变化添加弹性动画
+                                .animation(
+                                    .interactiveSpring(
+                                        response: 0.9, dampingFraction: 0.6),
+                                    value: viewmodel.currentlyPlayingLyricsIndex
+                                )
                         }
                     }
-                    .drawingGroup()
                     .padding(.trailing, 100)
                 }
-                .scrollDisabled(true)
                 .onAppear {
                     // 优化初始滚动延迟
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -126,7 +114,7 @@ struct FullScreenView: View {
                 }
                 .onChange(of: viewmodel.currentlyPlayingLyricsIndex) {
                     newValue in
-                    withAnimation(.smoothScroll(duration: 1.2)) {
+                    withAnimation(.smooth(duration: 1.2)) {
                         if let currentIndex = newValue {
                             proxy.scrollTo(
                                 viewmodel.currentlyPlayingLyrics[currentIndex],
@@ -184,6 +172,9 @@ struct FullScreenView: View {
                     .font(.title)
                     .bold()
                     .padding(.top, 30)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.center)
+                                    .frame(maxWidth: (canDisplayLyrics ? 450 : 650) * 0.9)
                 Text(verbatim: viewmodel.currentTrack?.artist ?? "")
                     .font(.title2)
             }
@@ -211,8 +202,8 @@ struct FullScreenView: View {
         var body: some View {
             TimelineView(.animation) { _ in
                 let t = Date().timeIntervalSinceReferenceDate
-                let offset = 0.2 * sin(t)
-                let hueShift = 0.04 * sin(t * 0.6)
+                let offset = 0.2 * sin(t) * 0.8
+                let hueShift = 0.02 * sin(t * 0.4)
 
                 let animatedColors = colors.enumerated().map { index, color in
                     color.adjustedHue(by: Double(index) * hueShift * 360)
@@ -229,7 +220,7 @@ struct FullScreenView: View {
                     width: 3,
                     height: 3,
                     points: simdPoints,
-                    colors: animatedColors
+                    colors: colors
                 )
                 .ignoresSafeArea()
             }

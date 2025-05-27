@@ -35,9 +35,15 @@ class ViewModel: ObservableObject {
 
     private func lyricUpdater() async throws {
         repeat {
-            print("lyric index: \(String(describing: currentlyPlayingLyricsIndex))")
+            #if DEBUG
+                print(
+                    "lyric index: \(String(describing: currentlyPlayingLyricsIndex))"
+                )
+            #endif
             guard let playerPosition = appleMusicScript?.playerPosition else {
-                print("no player position hence stopped")
+                #if DEBUG
+                    print("no player position hence stopped")
+                #endif
                 // pauses the timer bc there's no player position
                 stopLyricUpdater()
                 return
@@ -52,55 +58,64 @@ class ViewModel: ObservableObject {
             // If there is no current index (perhaps lyric updater started late and we're mid-way of the first lyric, or the user scrubbed and our index is expired)
             // Then we set the current index to the one before our anticipated index
             if currentlyPlayingLyricsIndex == nil && lastIndex > 0 {
-                withAnimation {
+                withAnimation(.linear(duration: 0.2)) {
                     currentlyPlayingLyricsIndex = lastIndex - 1
                 }
             }
-            
+
             var nextTimestamp = currentlyPlayingLyrics[lastIndex].startTimeMS
-//            if currentlyPlayingLyrics.indices.contains(lastIndex + 1),
-//               currentlyPlayingLyrics[lastIndex + 1].words.isEmpty {
-//                nextTimestamp = currentlyPlayingLyrics[lastIndex + 1].startTimeMS
-//            }
+            //            if currentlyPlayingLyrics.indices.contains(lastIndex + 1),
+            //               currentlyPlayingLyrics[lastIndex + 1].words.isEmpty {
+            //                nextTimestamp = currentlyPlayingLyrics[lastIndex + 1].startTimeMS
+            //            }
             let diff = nextTimestamp - currentTime
-            print("current time: \(currentTime)")
-            print("next time: \(nextTimestamp)")
-            print("the difference is \(diff)")
+            #if DEBUG
+                print("current time: \(currentTime)")
+                print("next time: \(nextTimestamp)")
+                print("the difference is \(diff)")
+            #endif
             try await Task.sleep(nanoseconds: UInt64(1_000_000 * diff))
-            print("last index: \(lastIndex)")
+            #if DEBUG
+                print("last index: \(lastIndex)")
+            #endif
             if currentlyPlayingLyrics.count > lastIndex {
-                withAnimation {
+                withAnimation(.linear(duration: 0.2)) {
                     currentlyPlayingLyricsIndex = lastIndex
                 }
             } else {
                 currentlyPlayingLyricsIndex = nil
             }
-            if !isLyricsPrepared && currentlyPlayingLyricsIndex != nil{
-                isLyricsPrepared = true
-            }
-            print(
-                "current lyrics index is now \(currentlyPlayingLyricsIndex?.description ?? "nil")"
-            )
+            #if DEBUG
+                print(
+                    "current lyrics index is now \(currentlyPlayingLyricsIndex?.description )"
+                )
+            #endif
         } while !Task.isCancelled
     }
 
     func startLyricUpdater() {
-        print("start update task")
-        print(
-            "isPlaying: \(self.isShowLyrics), lyrics.isEmpty: \(currentlyPlayingLyrics.isEmpty)"
-        )
+        #if DEBUG
+            print("start update task")
+            print(
+                "isPlaying: \(self.isShowLyrics), lyrics.isEmpty: \(currentlyPlayingLyrics.isEmpty)"
+            )
+        #endif
         currentLyricsUpdaterTask?.cancel()
         currentLyricsUpdaterTask = Task {
             do {
                 try await lyricUpdater()
             } catch {
-                print("lyrics were canceled \(error)")
+                #if DEBUG
+                    print("lyrics were canceled \(error)")
+                #endif
             }
         }
     }
 
     func stopLyricUpdater() {
-        print("stop update task")
+        #if DEBUG
+            print("stop update task")
+        #endif
         currentlyPlayingLyricsIndex = nil
         isLyricsPrepared = false
         currentLyricsUpdaterTask?.cancel()
@@ -110,7 +125,9 @@ class ViewModel: ObservableObject {
         if let currentlyPlayingLyricsIndex {
             let newIndex = currentlyPlayingLyricsIndex + 1
             if newIndex >= currentlyPlayingLyrics.count {
-                print("REACHED LAST LYRIC!!!!!!!!")
+                #if DEBUG
+                    print("REACHED LAST LYRIC!!!!!!!!")
+                #endif
                 // if current time is before our current index's start time, the user has scrubbed and rewinded
                 // reset into linear search mode
                 if currentTime
@@ -127,7 +144,9 @@ class ViewModel: ObservableObject {
                 .startTimeMS,
                 currentTime < currentlyPlayingLyrics[newIndex].startTimeMS
             {
-                print("just the next lyric")
+                #if DEBUG
+                    print("just the next lyric")
+                #endif
                 return newIndex
             }
         }
@@ -137,60 +156,64 @@ class ViewModel: ObservableObject {
             $0.startTimeMS > currentTime
         })
     }
-    
-//    var derivedColor: Color? {
-//        guard let color = currentAlbumColor else { return nil }
-//        
-//        // 将 NSColor 转换为 HSL
-//        var hue: CGFloat = 0
-//        var saturation: CGFloat = 0
-//        var lightness: CGFloat = 0
-//        color.getHue(&hue, saturation: &saturation, brightness: &lightness, alpha: nil)
-//        
-//        // 降低饱和度至 0.2-0.4 区间
-//        let adjustedSaturation = saturation * 0.35
-//        
-//        // 保持亮度在安全区间
-//        let safeLightness = max(0.3, min(lightness, 0.7))
-//        
-//        return Color(
-//            hue: hue,
-//            saturation: adjustedSaturation,
-//            brightness: safeLightness,
-//            opacity: 0.6
-//        )
-//    }
+
+    //    var derivedColor: Color? {
+    //        guard let color = currentAlbumColor else { return nil }
+    //
+    //        // 将 NSColor 转换为 HSL
+    //        var hue: CGFloat = 0
+    //        var saturation: CGFloat = 0
+    //        var lightness: CGFloat = 0
+    //        color.getHue(&hue, saturation: &saturation, brightness: &lightness, alpha: nil)
+    //
+    //        // 降低饱和度至 0.2-0.4 区间
+    //        let adjustedSaturation = saturation * 0.35
+    //
+    //        // 保持亮度在安全区间
+    //        let safeLightness = max(0.3, min(lightness, 0.7))
+    //
+    //        return Color(
+    //            hue: hue,
+    //            saturation: adjustedSaturation,
+    //            brightness: safeLightness,
+    //            opacity: 0.6
+    //        )
+    //    }
 }
 extension NSImage {
-    func toSwiftUIImage() -> Image{
+    func toSwiftUIImage() -> Image {
         Image(nsImage: self)
     }
     func findDominantColors(maxK: Int = 5) -> [NSColor]? {
         guard let tiffData = self.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffData),
-              let cgImage = bitmap.cgImage else {
+            let bitmap = NSBitmapImageRep(data: tiffData),
+            let cgImage = bitmap.cgImage
+        else {
             return nil
         }
 
         let size = CGSize(width: 64, height: 64)
-        guard let context = CGContext(
-            data: nil,
-            width: Int(size.width),
-            height: Int(size.height),
-            bitsPerComponent: 8,
-            bytesPerRow: Int(size.width) * 4,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return nil }
+        guard
+            let context = CGContext(
+                data: nil,
+                width: Int(size.width),
+                height: Int(size.height),
+                bitsPerComponent: 8,
+                bytesPerRow: Int(size.width) * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        else { return nil }
 
         context.draw(cgImage, in: CGRect(origin: .zero, size: size))
         guard let data = context.data else { return nil }
-        let ptr = data.bindMemory(to: UInt8.self, capacity: Int(size.width * size.height * 4))
+        let ptr = data.bindMemory(
+            to: UInt8.self, capacity: Int(size.width * size.height * 4))
 
         var points: [(CGFloat, CGFloat, CGFloat)] = []
 
-        for x in 0 ..< Int(size.width) {
-            for y in 0 ..< Int(size.height) {
+        for x in 0..<Int(size.width) {
+            for y in 0..<Int(size.height) {
                 let offset = 4 * (y * Int(size.width) + x)
                 let r = CGFloat(ptr[offset]) / 255.0
                 let g = CGFloat(ptr[offset + 1]) / 255.0
@@ -209,14 +232,17 @@ extension NSImage {
 
         // 简易 k-means 聚类
         var centroids = points.shuffled().prefix(k)
-        var clusters: [[(CGFloat, CGFloat, CGFloat)]] = Array(repeating: [], count: k)
+        var clusters: [[(CGFloat, CGFloat, CGFloat)]] = Array(
+            repeating: [], count: k)
 
         for _ in 0..<10 {
             clusters = Array(repeating: [], count: k)
             for point in points {
                 let index = centroids.enumerated().min(by: {
-                    pow($0.1.0 - point.0, 2) + pow($0.1.1 - point.1, 2) + pow($0.1.2 - point.2, 2)
-                    < pow($1.1.0 - point.0, 2) + pow($1.1.1 - point.1, 2) + pow($1.1.2 - point.2, 2)
+                    pow($0.1.0 - point.0, 2) + pow($0.1.1 - point.1, 2)
+                        + pow($0.1.2 - point.2, 2)
+                        < pow($1.1.0 - point.0, 2) + pow($1.1.1 - point.1, 2)
+                        + pow($1.1.2 - point.2, 2)
                 })!.offset
                 clusters[index].append(point)
             }
@@ -232,13 +258,17 @@ extension NSImage {
         }
 
         // 排序并输出颜色
-        let sorted = clusters.enumerated().sorted { $0.element.count > $1.element.count }
+        let sorted = clusters.enumerated().sorted {
+            $0.element.count > $1.element.count
+        }
         return sorted.map {
             let sum = $0.element.reduce((0.0, 0.0, 0.0)) {
                 ($0.0 + $1.0, $0.1 + $1.1, $0.2 + $1.2)
             }
             let count = CGFloat($0.element.count)
-            return NSColor(red: sum.0 / count, green: sum.1 / count, blue: sum.2 / count, alpha: 1.0)
+            return NSColor(
+                red: sum.0 / count, green: sum.1 / count, blue: sum.2 / count,
+                alpha: 1.0)
         }
     }
 }
@@ -247,14 +277,16 @@ extension NSImage {
 extension NSColor {
     var balancedColor: Color {
         let ciColor = CIColor(color: self)!
-        
+
         // 计算亮度 (ITU-R BT.709 标准)
-        let luminance = 0.2126 * ciColor.red + 0.7152 * ciColor.green + 0.0722 * ciColor.blue
-        
+        let luminance =
+            0.2126 * ciColor.red + 0.7152 * ciColor.green + 0.0722
+            * ciColor.blue
+
         // 动态调整参数
         let targetLuminance: CGFloat = 0.2
         let adjustment = (targetLuminance - luminance) * 0.5
-        
+
         return Color(
             red: Double(ciColor.red + adjustment),
             green: Double(ciColor.green + adjustment),

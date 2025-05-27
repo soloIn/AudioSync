@@ -53,27 +53,7 @@ struct KaraokeView: View {
             .currentlyPlayingLyricsIndex, viewmodel.currentlyPlayingLyrics.indices.contains(currentlyPlayingLyricsIndex),
            !viewmodel.currentlyPlayingLyrics[currentlyPlayingLyricsIndex].words.isEmpty
         {
-            if viewmodel.translationExists {
-                if viewmodel.karaokeShowMultilingual {
-                    multilingualView(currentlyPlayingLyricsIndex)
-                } else {
-                    Text(
-                        verbatim: viewmodel.currentlyPlayingLyrics[
-                            currentlyPlayingLyricsIndex
-                        ].words)
-                }
-            } else {
-                if let toLatin = viewmodel.currentlyPlayingLyrics[
-                    currentlyPlayingLyricsIndex
-                ].words.applyingTransform(.toLatin, reverse: false) {
-                    Text(verbatim: toLatin)
-                } else {
-                    Text(
-                        verbatim: viewmodel.currentlyPlayingLyrics[
-                            currentlyPlayingLyricsIndex
-                        ].words)
-                }
-            }
+            multilingualView(currentlyPlayingLyricsIndex)
         } else {
             Text("···")
         }
@@ -106,7 +86,7 @@ struct KaraokeView: View {
                 .overlay(Color.gray.opacity(0.2))
                 .transition(.opacity)
             }
-            .drawingGroup()
+//            .drawingGroup()
             .background(
                 VisualEffectView().ignoresSafeArea()
             )

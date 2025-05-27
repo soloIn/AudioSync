@@ -1,18 +1,27 @@
-import CoreAudio
 import Combine
+import CoreAudio
+
 class AudioFormatManager: ObservableObject {
-    static let shared:AudioFormatManager =  AudioFormatManager()
+    static let shared: AudioFormatManager = AudioFormatManager()
     @Published var sampleRate: Int?
     @Published var bitDepth: Int?
-    
-    var currentFormat: (sampleRate: Int, bitDepth:Int ) = (0,0) {
-            didSet {
-                print("currentFormat change")
+
+    var currentFormat: (sampleRate: Int, bitDepth: Int) = (0, 0) {
+        didSet {
+            // 避免不必要的更新，如果值没有实际变化
+            if oldValue.sampleRate != currentFormat.sampleRate
+                || oldValue.bitDepth != currentFormat.bitDepth
+            {
+                print(
+                    "currentFormat changed from (\(oldValue.sampleRate), \(oldValue.bitDepth)) to (\(currentFormat.sampleRate), \(currentFormat.bitDepth))"
+                )
                 sampleRate = currentFormat.sampleRate
                 bitDepth = currentFormat.bitDepth
-                onFormatUpdate?(currentFormat.sampleRate, currentFormat.bitDepth)
+                onFormatUpdate?(
+                    currentFormat.sampleRate, currentFormat.bitDepth)
             }
         }
+    }
     var onFormatUpdate: ((Int, Int) -> Void)?
 
     // 保持原有日志监控和格式设置逻辑...
@@ -31,7 +40,6 @@ class AudioFormatManager: ObservableObject {
         setupLogProcess()
     }
 
-    
     private func isDeviceRunning(_ deviceID: AudioDeviceID) -> Bool {
         var isRunning: UInt32 = 0
         var size = UInt32(MemoryLayout.size(ofValue: isRunning))
@@ -46,7 +54,7 @@ class AudioFormatManager: ObservableObject {
 
         return status == noErr && isRunning != 0
     }
-    
+
     private func setupLogProcess() {
         logProcess = Process()
         logProcess?.executableURL = URL(fileURLWithPath: "/usr/bin/log")
@@ -55,7 +63,6 @@ class AudioFormatManager: ObservableObject {
             "--predicate",
             "process == 'Music' AND message CONTAINS 'Input format'",
             "--info",
-            "--debug",
         ]
 
         let pipe = Pipe()
@@ -72,14 +79,23 @@ class AudioFormatManager: ObservableObject {
             }
         }
 
-        logProcess?.terminationHandler = { [weak self] _ in
-            self?.isMonitoring = false
+        logProcess?.terminationHandler = { [weak self] process in
+            // 确保在主线程或特定队列上更新状态
+            DispatchQueue.main.async {
+                print(
+                    "AudioFormatManager: Log process terminated. Exit code: \(process.terminationStatus)"
+                )
+                self?.isMonitoring = false
+            }
         }
 
         do {
             try logProcess?.run()
         } catch {
-            print("Process start error: \(error)")
+            print("AudioFormatManager: Process start error: \(error)")
+            DispatchQueue.main.async {
+                self.isMonitoring = false  // 启动失败，重置状态
+            }
         }
     }
 
@@ -129,12 +145,11 @@ class AudioFormatManager: ObservableObject {
         setStreamBitDepth(currentFormat.bitDepth, for: deviceID)
     }
 
-    
     func stopMonitoring() {
         guard isMonitoring else { return }
         logProcess?.terminate()
         logProcess = nil
-        isMonitoring = false
+        DispatchQueue.main.async { self.isMonitoring = false }
     }
 
     private func setNominalSampleRate(_ rate: Int, for device: AudioDeviceID) {
