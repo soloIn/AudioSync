@@ -1,7 +1,7 @@
 import AppKit
 import CoreAudio
 import ScriptingBridge
-
+import SwiftUI
 struct TrackInfo {
     let name: String
     let artist: String
@@ -10,7 +10,7 @@ struct TrackInfo {
     let album: String
     let state: String
     let genre: String
-    let color: [NSColor]?
+    let color: [Color]?
     let albumCover: NSImage?
 }
 
@@ -44,6 +44,7 @@ class PlaybackNotifier {
                 "appleNotification:  userInfo is missing required fields.")
             return
         }
+        print("appleNotification: \(userInfo)")
 
         guard let script = appleMusicScript,
             let currentTrack = script.currentTrack,  // 首先确保 currentTrack 存在

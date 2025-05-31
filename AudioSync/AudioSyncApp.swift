@@ -165,7 +165,7 @@ struct AudioSyncApp: App {
         
         
         WindowGroup("fullScreenLyrics", id: "fullScreen") {
-            FullScreenView().environmentObject(viewModel)
+            FullScreenView(isPresented: $isFullScreenVisible).environmentObject(viewModel)
                 .onWindowDidAppear { window in
                     window.collectionBehavior = .fullScreenPrimary
 
@@ -228,7 +228,7 @@ class FullScreenWindowDelegate: NSObject, NSWindowDelegate {
 
     func windowDidExitFullScreen(_ notification: Notification) {
         // 延迟关闭，等系统完成退出动画
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             self.onExitFullScreen?()
         }
     }

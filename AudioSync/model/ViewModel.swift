@@ -21,10 +21,11 @@ class ViewModel: ObservableObject {
     @Published var karaokeShowMultilingual: Bool = true
     @Published var isShowLyrics: Bool = false
     @Published var isLyricsPrepared: Bool = false
-    @Published var currentAlbumColor: [NSColor] = []
+    @Published var currentAlbumColor: [Color] = []
     @Published var allCandidates: [CandidateSong] = []
     @Published var needNanualSelection: Bool = false
     @Published var currentTrack: TrackInfo?
+    @Published var scrollProxy: ScrollViewProxy?
     var onCandidateSelected: ((CandidateSong) -> Void)?  // ❗️等待用的回调
 
     var appleMusicScript: MusicApplication? = SBApplication(
@@ -158,7 +159,7 @@ extension NSImage {
     func toSwiftUIImage() -> Image {
         Image(nsImage: self)
     }
-    func findDominantColors(maxK: Int = 5) -> [NSColor]? {
+    func findDominantColors(maxK: Int = 3) -> [Color]? {
         guard let tiffData = self.tiffRepresentation,
             let bitmap = NSBitmapImageRep(data: tiffData),
             let cgImage = bitmap.cgImage
@@ -166,7 +167,7 @@ extension NSImage {
             return nil
         }
 
-        let size = CGSize(width: 64, height: 64)
+        let size = CGSize(width: 128, height: 128)
         guard
             let context = CGContext(
                 data: nil,
@@ -240,34 +241,11 @@ extension NSImage {
                 ($0.0 + $1.0, $0.1 + $1.1, $0.2 + $1.2)
             }
             let count = CGFloat($0.element.count)
-            return NSColor(
-                red: sum.0 / count, green: sum.1 / count, blue: sum.2 / count,
-                alpha: 1.0)
+            return Color(
+                red: sum.0 / count, green: sum.1 / count, blue: sum.2 / count)
         }
     }
-}
-
-// 颜色处理扩展
-extension NSColor {
-    var balancedColor: Color {
-        let ciColor = CIColor(color: self)!
-
-        // 计算亮度 (ITU-R BT.709 标准)
-        let luminance =
-            0.2126 * ciColor.red + 0.7152 * ciColor.green + 0.0722
-            * ciColor.blue
-
-        // 动态调整参数
-        let targetLuminance: CGFloat = 0.2
-        let adjustment = (targetLuminance - luminance) * 0.5
-
-        return Color(
-            red: Double(ciColor.red + adjustment),
-            green: Double(ciColor.green + adjustment),
-            blue: Double(ciColor.blue + adjustment),
-            opacity: 0.8
-        )
-    }
+    
 }
 struct CandidateSong {
     let id: String

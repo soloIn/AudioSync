@@ -9,24 +9,6 @@ import SwiftUI
 
 struct KaraokeView: View {
 
-    struct VisualEffectView: NSViewRepresentable {
-        func makeNSView(context: Context) -> NSVisualEffectView {
-            let view = NSVisualEffectView()
-
-            view.blendingMode = .behindWindow
-            view.state = .active
-            view.material = .hudWindow
-
-            return view
-        }
-
-        func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-
-            nsView.material = .hudWindow
-            nsView.blendingMode = .behindWindow
-        }
-    }
-
     @EnvironmentObject var viewmodel: ViewModel
     func multilingualView(_ currentlyPlayingLyricsIndex: Int) -> some View {
         VStack(spacing: 6) {
@@ -43,7 +25,7 @@ struct KaraokeView: View {
                             viewmodel.karaokeFont.fontName,
                             size: 0.9 * (viewmodel.karaokeFont.pointSize))
                     )
-                    .opacity(0.85)
+//                    .opacity(0.85)
             }
         }
     }
@@ -71,25 +53,19 @@ struct KaraokeView: View {
             .padding(10)
             .padding(.horizontal, 10)
             .background {
-                Group {
-                    if !viewmodel.currentAlbumColor.isEmpty {
+                VisualEffectView().ignoresSafeArea()
+                if !viewmodel.currentAlbumColor.isEmpty {
+                    ZStack {
                         LinearGradient(
                             gradient: Gradient(
-                                colors: viewmodel.currentAlbumColor.map {
-                                    Color($0)
-                                }),
+                                colors: viewmodel.currentAlbumColor),
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
+                        Color.black.opacity(0.1)
                     }
                 }
-                .overlay(Color.gray.opacity(0.2))
-                .transition(.opacity)
             }
-//            .drawingGroup()
-            .background(
-                VisualEffectView().ignoresSafeArea()
-            )
             .cornerRadius(16)
             .multilineTextAlignment(.center)
             .frame(
@@ -98,7 +74,23 @@ struct KaraokeView: View {
 
     }
 }
+struct VisualEffectView: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
 
+        view.blendingMode = .behindWindow
+        view.state = .active
+        view.material = .popover
+
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+
+        nsView.material = .popover
+        nsView.blendingMode = .behindWindow
+    }
+}
 //#Preview {
 //    KaraokeView()
 //        .environmentObject(ViewModel.preview)

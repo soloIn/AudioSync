@@ -44,6 +44,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
 
         NSApp.setActivationPolicy(.accessory)
+//        registerMetalShaders()
         playbackNotifier = PlaybackNotifier()
         Task { @MainActor in
             self.networkUtil = NetworkUtil(viewModel: self.viewModel)
@@ -189,6 +190,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let context = coreDataContainer.viewContext
         SongObject.deleteSong(byID: trackID, context: context)
+        viewModel.currentTrack = nil
         playbackNotifier?.scriptNotification()
     }
 

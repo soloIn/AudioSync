@@ -2,7 +2,7 @@ import AppKit
 import Combine
 import SwiftUI
 
-struct FullScreenView: View {
+struct FullScreenTestView: View {
     @EnvironmentObject var viewmodel: ViewModel
     @State private var cachedColors: [Color] = []
     @Binding var isPresented: Bool
@@ -702,5 +702,4 @@ struct FullScreenView: View {
     }
 
 }
-
 
