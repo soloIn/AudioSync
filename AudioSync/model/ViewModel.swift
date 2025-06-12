@@ -19,13 +19,14 @@ class ViewModel: ObservableObject {
     @Published var karaokeFont: NSFont = NSFont.boldSystemFont(ofSize: 30)
     @Published var translationExists: Bool = true
     @Published var karaokeShowMultilingual: Bool = true
-    @Published var isShowLyrics: Bool = false
+    @Published var isViewLyricsShow: Bool = false
     @Published var isLyricsPrepared: Bool = false
     @Published var currentAlbumColor: [Color] = []
     @Published var allCandidates: [CandidateSong] = []
     @Published var needNanualSelection: Bool = false
     @Published var currentTrack: TrackInfo?
     @Published var scrollProxy: ScrollViewProxy?
+    @Published var isCurrentTrackPlaying: Bool = false
     var onCandidateSelected: ((CandidateSong) -> Void)?  // ❗️等待用的回调
 
     var appleMusicScript: MusicApplication? = SBApplication(
@@ -94,7 +95,7 @@ class ViewModel: ObservableObject {
         #if DEBUG
             print("start update task")
             print(
-                "isPlaying: \(self.isShowLyrics), lyrics.isEmpty: \(currentlyPlayingLyrics.isEmpty)"
+                "isViewLyricsShow: \(self.isViewLyricsShow), lyrics.isEmpty: \(currentlyPlayingLyrics.isEmpty)"
             )
         #endif
         currentLyricsUpdaterTask?.cancel()
@@ -113,8 +114,8 @@ class ViewModel: ObservableObject {
         #if DEBUG
             print("stop update task")
         #endif
-        currentlyPlayingLyricsIndex = nil
-        isLyricsPrepared = false
+//        currentlyPlayingLyricsIndex = nil
+//        isLyricsPrepared = false
         currentLyricsUpdaterTask?.cancel()
     }
 

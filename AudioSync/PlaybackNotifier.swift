@@ -8,10 +8,14 @@ struct TrackInfo {
     let albumArtist: String
     let trackID: String
     let album: String
-    let state: String
+    let state: PlayState
     let genre: String
     let color: [Color]?
     let albumCover: NSImage?
+}
+enum PlayState {
+    case playing
+    case stop
 }
 
 class PlaybackNotifier {
@@ -46,35 +50,34 @@ class PlaybackNotifier {
         }
         print("appleNotification: \(userInfo)")
 
-        guard let script = appleMusicScript,
-            let currentTrack = script.currentTrack,  // 首先确保 currentTrack 存在
-            let persistentID = currentTrack.persistentID,  // 然后安全地访问其属性
-            let artworkData =
-                (currentTrack.artworks?().firstObject as? MusicArtwork)?.data
-        else {
-            print(
-                "appleMusicScript: Failed to retrieve complete track information "
+        Task {
+            guard let scriptTrack = await fetchCurrentTrackWithRetry()
+            else {
+                print(
+                    "appleMusicScript: Failed to retrieve complete track information "
+                )
+                return
+            }
+            let trackInfo = TrackInfo(
+                name: name,
+                artist: userInfo["Artist"] as? String ?? "",
+                albumArtist: userInfo["Album Artist"] as? String ?? "",
+                trackID: scriptTrack.trackID,
+                album: userInfo["Album"] as? String ?? "",
+                state: state == "Playing" ? .playing : .stop,
+                genre: userInfo["Genre"] as? String ?? "",
+                color: scriptTrack.color,
+                albumCover: scriptTrack.albumCover
             )
-            return
+
+            #if DEBUG
+
+            print("appleNotification：\(trackInfo)")
+
+            #endif
+            onPlay?(trackInfo)
         }
-        let trackInfo = TrackInfo(
-            name: name,
-            artist: userInfo["Artist"] as? String ?? "",
-            albumArtist: userInfo["Album Artist"] as? String ?? "",
-            trackID: persistentID,
-            album: userInfo["Album"] as? String ?? "",
-            state: state,
-            genre: userInfo["Genre"] as? String ?? "",
-            color: artworkData.findDominantColors(),
-            albumCover: artworkData
-        )
-
-        #if DEBUG
-
-        print("appleNotification：\(trackInfo)")
-
-        #endif
-        onPlay?(trackInfo)
+        
     }
 
     func scriptNotification() {
@@ -89,12 +92,11 @@ class PlaybackNotifier {
         #endif
         onPlay?(track)
     }
-    func stringFromPlayerState(_ state: MusicEPlS) -> String {
+    func stringFromPlayerState(_ state: MusicEPlS) -> PlayState {
         switch state {
-        case .playing: return "playing"
-        case .paused: return "paused"
-        case .stopped: return "stopped"
-        default: return "unknown(\(state.rawValue))"
+        case .playing: return .playing
+        case .stopped: return .stop
+        default: return .stop
         }
     }
     func fetchCurrentTrack() -> TrackInfo? {
@@ -114,9 +116,27 @@ class PlaybackNotifier {
         let track = TrackInfo(
             name: trackInfo.name ?? "", artist: trackInfo.artist ?? "",
             albumArtist: trackInfo.albumArtist ?? "",
-            trackID: trackInfo.persistentID ?? "", album: trackInfo.album ?? "",
+            trackID: persistentID, album: trackInfo.album ?? "",
             state: stringFromPlayerState(state), genre: trackInfo.genre ?? "",
             color: artworkData.findDominantColors(), albumCover: artworkData)
         return track
+    }
+    func fetchCurrentTrackWithRetry(
+        maxRetryCount: Int = 3,
+        delaySeconds: Double = 0.5
+    ) async -> TrackInfo? {
+        for attempt in 1...maxRetryCount {
+            if let track =  fetchCurrentTrack() {
+                return track
+            } else {
+                if attempt < maxRetryCount {
+                    print("第 \(attempt) 次尝试失败，\(delaySeconds) 秒后重试...")
+                    try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+                } else {
+                    print("达到最大重试次数，放弃。")
+                }
+            }
+        }
+        return nil
     }
 }

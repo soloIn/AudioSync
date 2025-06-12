@@ -13,7 +13,7 @@ import SwiftUI
 @main
 struct AudioSyncApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State var viewModel = ViewModel.shared
+    @ObservedObject var viewModel = ViewModel.shared
     @AppStorage("isKaraokeVisible") var isKaraokeVisible: Bool = false
     @State var isFullScreenVisible: Bool = false
     @State var karaoKeWindow: NSWindow? = nil
@@ -22,7 +22,7 @@ struct AudioSyncApp: App {
     @ObservedObject var audioManager = AudioFormatManager.shared
 
     private func CreateKaraoke() {
-        if isKaraokeVisible && !isFullScreenVisible{
+        if isKaraokeVisible && !isFullScreenVisible && viewModel.isCurrentTrackPlaying{
             if karaoKeWindow == nil {
                 let contentView = NSHostingView(
                     rootView: KaraokeView().environmentObject(viewModel))
@@ -124,7 +124,7 @@ struct AudioSyncApp: App {
                     Image(systemName: "headphones.circle")
                 }
                 .onAppear {
-                    viewModel.isShowLyrics =
+                    viewModel.isViewLyricsShow =
                         isKaraokeVisible || isFullScreenVisible
                     CreateKaraoke()
                 }
@@ -133,18 +133,13 @@ struct AudioSyncApp: App {
                 }
             }
         )
-        .onChange(of: audioManager.bitDepth, {
-            #if DEBUG
-            print("监听格式: \(audioManager.bitDepth)")
-            #endif
-        })
         .onChange(
             of: isFullScreenVisible,
             {
                 #if DEBUG
                 print("isFullScreenVisible change: \(isFullScreenVisible)")
                 #endif
-                viewModel.isShowLyrics = isKaraokeVisible || isFullScreenVisible
+                viewModel.isViewLyricsShow = isKaraokeVisible || isFullScreenVisible
                 if isFullScreenVisible {
                     openWindow(id: "fullScreen")
                     NSApplication.shared.activate()
@@ -159,9 +154,12 @@ struct AudioSyncApp: App {
                 #if DEBUG
                 print("isKaraokeVisible change: \(isKaraokeVisible)")
                 #endif
-                viewModel.isShowLyrics = isKaraokeVisible || isFullScreenVisible
+                viewModel.isViewLyricsShow = isKaraokeVisible || isFullScreenVisible
                 CreateKaraoke()
             })
+        .onChange(of: viewModel.isCurrentTrackPlaying, {
+            CreateKaraoke()
+        })
         
         
         WindowGroup("fullScreenLyrics", id: "fullScreen") {

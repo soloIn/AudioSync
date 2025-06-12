@@ -631,7 +631,7 @@ struct FullScreenView: View {
     }
 
     var canDisplayLyrics: Bool {
-        viewmodel.isShowLyrics
+        viewmodel.isViewLyricsShow
     }
 
     func meshColors() -> [Color] {
@@ -650,6 +650,7 @@ struct FullScreenView: View {
             if let album = viewmodel.currentTrack?.albumCover {
                 Image(nsImage: album)
                     .resizable()
+                    .aspectRatio(contentMode: .fit)
                     .clipShape(
                         .rect(
                             cornerRadii: .init(
@@ -679,19 +680,22 @@ struct FullScreenView: View {
             }
             Group {
                 Text(verbatim: viewmodel.currentTrack?.name ?? "")
-                    .font(.title)
+                    .font(.custom(NSFont.boldSystemFont(ofSize: 28).fontName, size: 28))
                     .bold()
+                    .foregroundStyle(.white)
                     .padding(.top, 30)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: (canDisplayLyrics ? 450 : 650) * 0.9)
                 Text(verbatim: viewmodel.currentTrack?.artist ?? "")
-                    .font(.title2)
+                    .font(.custom(NSFont.boldSystemFont(ofSize: 22).fontName, size: 22))
+                    .foregroundStyle(.white)
+                    .opacity(0.7)
             }
             .frame(height: 35)
             HStack {
                 Button {
-                    viewmodel.isShowLyrics.toggle()
+                    viewmodel.isViewLyricsShow.toggle()
                 } label: {
                     Image(systemName: "music.note.list")
                 }

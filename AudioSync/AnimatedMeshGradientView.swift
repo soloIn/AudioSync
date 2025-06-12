@@ -69,6 +69,15 @@ struct MetalMeshGradientView: NSViewRepresentable {
         struct GridPoint {
             var position: SIMD2<Float>
         }
+
+        // MovingPoint 结构体
+        struct MovingPoint {
+            var position: SIMD2<Float>
+            var direction: SIMD2<Float>
+        }
+
+        // 存储9个动态点
+        var movingPoints: [MovingPoint] = []
         
         init(colors: [Color]) {
             // 获取默认 Metal 设备
@@ -155,7 +164,18 @@ struct MetalMeshGradientView: NSViewRepresentable {
             )!
             
             super.init()
-            
+
+            // 初始化9个随机位置和方向的movingPoints
+            for _ in 0..<9 {
+                let pos = SIMD2<Float>(
+                    Float.random(in: 0.2...0.8),
+                    Float.random(in: 0.2...0.8)
+                )
+                let angle = Float.random(in: 0..<2 * .pi)
+                let dir = SIMD2<Float>(cos(angle), sin(angle))
+                movingPoints.append(MovingPoint(position: pos, direction: dir))
+            }
+
             // 初始化颜色和网格点
             updateColors(colors) // 初始颜色加载
             updateGridPoints(time: 0) // 初始网格点位置
@@ -187,31 +207,34 @@ struct MetalMeshGradientView: NSViewRepresentable {
             colorBuffer.didModifyRange(0..<colorBuffer.length)
         }
         
+        func smoothRandom(_ seed: Float, time: Float) -> Float {
+            // 基于 seed+time 生成伪随机序列（可替换为更复杂插值）
+            let sinS = sin(seed * 12.9898 + time * 0.19)
+            let trunS = 43758.5453.truncatingRemainder(dividingBy: 1.0) * 2.0
+            return sinS * Float(trunS) - 1.0
+        }
+        
         func updateGridPoints(time: Float) {
-            // 计算动画偏移量，这里使用 sin 函数制造周期性摆动
-            // 0.3 是振幅，0.8 是一个调节系数，可以调整动画的幅度
-            let dynamicOffset = 0.25 * sin(time * 0.7) // 调整时间和幅度使动画更明显
-            
-            // 定义9个网格点的动态位置
-            // 这些坐标是归一化的 [0,1] 范围，对应 UV 坐标空间
-            let gridPoints: [GridPoint] = [
-                // 第一行
-                GridPoint(position: SIMD2<Float>(0.0 + dynamicOffset * 0.5, 0.0 - dynamicOffset * 0.3)),
-                GridPoint(position: SIMD2<Float>(0.5, 0.0 + dynamicOffset)),
-                GridPoint(position: SIMD2<Float>(1.0 - dynamicOffset * 0.5, 0.0 + dynamicOffset * 0.3)),
-                
-                // 第二行
-                GridPoint(position: SIMD2<Float>(0.0 - dynamicOffset, 0.5)),
-                GridPoint(position: SIMD2<Float>(0.5 + dynamicOffset * 0.2, 0.5 - dynamicOffset * 0.2)), // 中心点也稍微动一下
-                GridPoint(position: SIMD2<Float>(1.0 + dynamicOffset, 0.5)),
-                
-                // 第三行
-                GridPoint(position: SIMD2<Float>(0.0 + dynamicOffset * 0.3, 1.0 + dynamicOffset * 0.5)),
-                GridPoint(position: SIMD2<Float>(0.5, 1.0 - dynamicOffset)),
-                GridPoint(position: SIMD2<Float>(1.0 - dynamicOffset * 0.3, 1.0 - dynamicOffset * 0.5))
-            ]
-            
-            // 更新网格点缓冲区内容
+            let speed: Float = 0.0005 // 控制运动速度
+
+            for i in 0..<movingPoints.count {
+                // 更新位置
+                movingPoints[i].position += movingPoints[i].direction * speed
+
+                // 边缘碰撞检测 + 反弹（保持在 [0, 1] 范围内）
+                var pos = movingPoints[i].position
+                var dir = movingPoints[i].direction
+
+                if pos.x < 0.0 { pos.x = 0.0; dir.x *= -1 }
+                if pos.x > 1.0 { pos.x = 1.0; dir.x *= -1 }
+                if pos.y < 0.0 { pos.y = 0.0; dir.y *= -1 }
+                if pos.y > 1.0 { pos.y = 1.0; dir.y *= -1 }
+
+                movingPoints[i] = MovingPoint(position: pos, direction: dir)
+            }
+
+            // 转换为 GridPoint 传给 GPU
+            let gridPoints = movingPoints.map { GridPoint(position: $0.position) }
             memcpy(gridPointsBuffer.contents(), gridPoints, MemoryLayout<GridPoint>.stride * 9)
             gridPointsBuffer.didModifyRange(0..<gridPointsBuffer.length)
         }
@@ -228,10 +251,6 @@ struct MetalMeshGradientView: NSViewRepresentable {
                   let renderPassDescriptor = view.currentRenderPassDescriptor else {
                 return
             }
-            
-            // renderPassDescriptor.colorAttachments[0].loadAction = .clear // 确保清除背景
-            // renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0) // 清除为透明
-
             // 更新时间 uniform
             let currentTime = CACurrentMediaTime() - startTime // 计算经过的时间
             var timeUniforms = TimeUniforms(time: Float(currentTime))
@@ -341,26 +360,25 @@ fragment float4 fragmentShader(
     
     // sharpness 控制颜色点的“锐度”或影响范围
     // 数值越大，影响范围越小，颜色点越清晰；数值越小，混合越平滑模糊
-    float sharpness = 25.0; // 可以调整这个值以获得期望的效果
+    float sharpness = 10.0; // 可以调整这个值以获得期望的效果
 
     // 遍历所有9个网格点
     for (int i = 0; i < 9; ++i) {
-        float2 pointPos = gridPoints[i].position; // 当前网格点的位置
-        float dist = distance(uv, pointPos);       // 计算当前片段到网格点的距离
-        
-        // 使用高斯型权重函数 (exp(-k * d^2))
-        // 这种权重衰减方式比简单的反比更平滑
-        float weight = exp(-sharpness * dist * dist);
-        
-        totalColor += colorsArray[i] * weight; // 累加加权颜色
-        totalWeight += weight;                 // 累加权重
+        float2 pointPos = gridPoints[i].position;
+        float2 offset = uv - pointPos;
+        float dist = length(offset);
+        float angleFactor = offset.x * 0.5 + offset.y * 1.5;
+        float weight = exp(-sharpness * dist) * (1.0 + 0.8 * sin(angleFactor * 10.0));
+
+        totalColor += colorsArray[i] * weight;
+        totalWeight += weight;
     }
 
     float4 finalColor;
     if (totalWeight == 0.0 || totalWeight < 0.0001) { // 避免除以零或极小的权重
         // 如果总权重几乎为零 (例如像素离所有点都很远，或者 sharpness 极高)
         // 可以返回一个默认颜色，或者第一个点的颜色，或者透明
-        finalColor = float4(0.0, 0.0, 0.0, 0.0); // 返回透明黑色
+        finalColor = colorsArray[0]; 
     } else {
         finalColor = totalColor / totalWeight; // 标准化颜色
     }
@@ -373,23 +391,3 @@ fragment float4 fragmentShader(
     return finalColor;
 }
 """
-
-// 这个函数不是必须的，因为着色器是在 Coordinator 初始化时编译的。
-// 但如果需要在应用启动时做一些全局的 Metal 初始化，可以保留。
-// func registerMetalShaders() {
-//     do {
-//         let _ =  MTKTextureLoader(device: MTLCreateSystemDefaultDevice()!)
-        
-//         let library = try MTLCreateSystemDefaultDevice()!.makeLibrary(
-//             source: metalShaderSource,
-//             options: nil
-//         )
-        
-//         _ = library.makeFunction(name: "vertexShader")
-//         _ = library.makeFunction(name: "fragmentShader")
-//     } catch {
-//         print("Failed to register Metal shaders: \(error)")
-//     }
-// }
-
-

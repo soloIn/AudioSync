@@ -48,7 +48,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         playbackNotifier = PlaybackNotifier()
         Task { @MainActor in
             self.networkUtil = NetworkUtil(viewModel: self.viewModel)
-            self.viewModel.$isShowLyrics
+            self.viewModel.$isViewLyricsShow
                 .removeDuplicates()
                 .sink { [weak self] isShowLyrics in
                     guard let self = self else { return }
@@ -70,20 +70,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 添加播放通知回调逻辑
         playbackNotifier?.onPlay = { [weak self] trackInfo in
-            if let lastTrack = self?.viewModel.currentTrack?.trackID,
-                lastTrack == trackInfo.trackID,
-                self?.viewModel.currentlyPlayingLyrics.isEmpty != true
-            {
-                self?.viewModel.startLyricUpdater()
-                #if DEBUG
-                    print("歌曲已准备好,跳过处理")
-                #endif
-                return
-            }
-            self?.viewModel.currentTrack = trackInfo
             // 采样率和位深同步
             Task {
-                guard trackInfo.state == "Playing" else { return }
+                guard trackInfo.state == .playing else { return }
                 self?.audioManager.onFormatUpdate = {
                     [weak self] sampleRate, bitDepth in
                     self?.audioManager.updateOutputFormat()
@@ -94,88 +83,108 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             // 歌词
-            Task {
+            Task { [weak self] in
+                guard let self else { return }
+
                 #if DEBUG
-                    print("歌词")
+                print("歌词")
                 #endif
-                self?.viewModel.currentlyPlayingLyrics = []
-                self?.viewModel.stopLyricUpdater()
-                if self?.viewModel.isShowLyrics == true {
-                    guard let context = self?.coreDataContainer.viewContext
-                    else { return }
 
-                    // 先查本地
-                    context.refreshAllObjects()
-                    if let songObject = SongObject.fetchSong(
-                        byID: trackInfo.trackID, context: context)
-                    {
-                        #if DEBUG
-                            print("songObject: \(songObject)")
-                        #endif
-                        let localLyrics = songObject.getLyrics()
-                        if !localLyrics.isEmpty {
-                            #if DEBUG
-                                print("本地歌词")
-                            #endif
-                            self?.viewModel.currentlyPlayingLyrics =
-                                localLyrics
-                            self?.viewModel.currentAlbumColor =
-                                trackInfo.color ?? []
-                            self?.viewModel.startLyricUpdater()
-                            return
-                        }
-                    }
-
-                    // 网络歌词
-                    do {
-                        let trackName = trackInfo.name
-                        let artist = trackInfo.artist
-
-                        if !trackName.isEmpty, !artist.isEmpty {
-                            let lyrics = try await self?.networkUtil?
-                                .fetchLyrics(
-                                    trackName: trackName, artist: artist,
-                                    trackID: trackInfo.trackID,
-                                    album: trackInfo.album,
-                                    genre: trackInfo.genre)
-                            if let lyrics, !lyrics.isEmpty {
-                                #if DEBUG
-                                    print("网络歌词")
-                                #endif
-                                guard
-                                    let finishLyrics = self?.finishLyric(
-                                        lyrics)
-                                else {
-                                    #if DEBUG
-                                        print("finishLyrics error")
-                                    #endif
-                                    return
-                                }
-                                self?.viewModel.currentlyPlayingLyrics =
-                                    finishLyrics
-                                self?.viewModel.currentAlbumColor =
-                                    trackInfo.color ?? []
-                                self?.viewModel.startLyricUpdater()
-                                SongObject.saveSong(
-                                    id: trackInfo.trackID,
-                                    trackName: trackName,
-                                    lyrics: finishLyrics, in: context)
-                            }
-                        } else {
-                            #if DEBUG
-                                print("原始标题或艺术家为空，跳过歌词请求")
-                            #endif
-                        }
-                    } catch {
-                        #if DEBUG
-                            print("网络歌词获取失败: \(error)")
-                        #endif
-                    }
+                if trackInfo.state == .playing {
+                    viewModel.isCurrentTrackPlaying = true
+                } else {
+                    viewModel.isCurrentTrackPlaying = false
+                    viewModel.stopLyricUpdater()
+                    return
                 }
+
+                // 若为同一首歌且已有歌词，不处理
+                if viewModel.currentTrack?.trackID == trackInfo.trackID,
+                   !viewModel.currentlyPlayingLyrics.isEmpty {
+                    viewModel.startLyricUpdater()
+                    #if DEBUG
+                    print("歌曲已准备好,跳过处理")
+                    #endif
+                    return
+                }
+
+                viewModel.currentTrack = trackInfo
+                viewModel.currentlyPlayingLyrics = []
+                viewModel.currentlyPlayingLyricsIndex = nil
+                viewModel.stopLyricUpdater()
+
+                guard viewModel.isViewLyricsShow else { return }
+                let context = coreDataContainer.viewContext
+                context.refreshAllObjects()
+
+                if loadLyricsFromLocal(trackInfo: trackInfo, context: context) {
+                    return
+                }
+
+                await loadLyricsFromNetwork(trackInfo: trackInfo, context: context)
 
             }
         }
     }
+    private func loadLyricsFromLocal(trackInfo: TrackInfo, context: NSManagedObjectContext) -> Bool {
+        if let songObject = SongObject.fetchSong(byID: trackInfo.trackID, context: context) {
+            let localLyrics = songObject.getLyrics()
+            if !localLyrics.isEmpty {
+                #if DEBUG
+                print("本地歌词")
+                #endif
+                viewModel.currentlyPlayingLyrics = localLyrics
+                viewModel.currentAlbumColor = trackInfo.color ?? []
+                viewModel.startLyricUpdater()
+                return true
+            }
+        }
+        return false
+    }
+    
+    private func loadLyricsFromNetwork(trackInfo: TrackInfo, context: NSManagedObjectContext) async {
+        do {
+            let trackName = trackInfo.name
+            let artist = trackInfo.artist
+
+            guard !trackName.isEmpty, !artist.isEmpty else {
+                #if DEBUG
+                print("原始标题或艺术家为空，跳过歌词请求")
+                #endif
+                return
+            }
+
+            if let lyrics = try await networkUtil?.fetchLyrics(
+                trackName: trackName,
+                artist: artist,
+                trackID: trackInfo.trackID,
+                album: trackInfo.album,
+                genre: trackInfo.genre
+            ), !lyrics.isEmpty{
+                let finishLyrics = finishLyric(lyrics)
+                #if DEBUG
+                print("网络歌词")
+                #endif
+
+                viewModel.currentlyPlayingLyrics = finishLyrics
+                viewModel.currentAlbumColor = trackInfo.color ?? []
+                viewModel.startLyricUpdater()
+
+                SongObject.saveSong(
+                    id: trackInfo.trackID,
+                    trackName: trackName,
+                    lyrics: finishLyrics,
+                    in: context
+                )
+            }
+
+        } catch {
+            #if DEBUG
+            print("网络歌词获取失败: \(error)")
+            #endif
+        }
+    }
+    
     func finishLyric(_ rawLyrics: [LyricLine]) -> [LyricLine] {
         guard let last = rawLyrics.last else { return rawLyrics }
         let virtualEndLine = LyricLine(
