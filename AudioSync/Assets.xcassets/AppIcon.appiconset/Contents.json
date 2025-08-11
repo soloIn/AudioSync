@@ -1,6 +1,7 @@
 {
   "images" : [
     {
+      "filename" : "16.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "16x16"
@@ -11,6 +12,7 @@
       "size" : "16x16"
     },
     {
+      "filename" : "audiosync32.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "32x32"
@@ -21,35 +23,37 @@
       "size" : "32x32"
     },
     {
+      "filename" : "audiosync128.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "128x128"
     },
     {
-      "filename" : "未命名 3.png",
+      "filename" : "audiosync256 1.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "128x128"
     },
     {
-      "filename" : "未命名 2.png",
+      "filename" : "audiosync256.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "256x256"
     },
     {
-      "filename" : "未命名 1.png",
+      "filename" : "audiosync512 1.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "256x256"
     },
     {
-      "filename" : "未命名.png",
+      "filename" : "audiosync512.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "512x512"
     },
     {
+      "filename" : "audiosync1024.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "512x512"
