@@ -18,7 +18,9 @@ class AudioFormatManager: ObservableObject {
                 sampleRate = currentFormat.sampleRate
                 bitDepth = currentFormat.bitDepth
                 onFormatUpdate?(
-                    currentFormat.sampleRate, currentFormat.bitDepth)
+                    currentFormat.sampleRate,
+                    currentFormat.bitDepth
+                )
             }
         }
     }
@@ -29,7 +31,9 @@ class AudioFormatManager: ObservableObject {
     private var logProcess: Process?
     private var isMonitoring = false
     private let processingQueue = DispatchQueue(
-        label: "com.audio.format.monitor", qos: .userInitiated)
+        label: "com.audio.format.monitor",
+        qos: .userInitiated
+    )
 
     private var lastLogEntry: String = ""
     private var lastLogTime: TimeInterval = 0
@@ -37,6 +41,10 @@ class AudioFormatManager: ObservableObject {
     func startMonitoring() {
         guard !isMonitoring else { return }
         isMonitoring = true
+
+        // 先抓过去 5 秒的历史日志，避免漏掉启动前的 Input format
+        fetchRecentLogs()
+
         setupLogProcess()
     }
 
@@ -50,11 +58,49 @@ class AudioFormatManager: ObservableObject {
         )
 
         let status = AudioObjectGetPropertyData(
-            deviceID, &address, 0, nil, &size, &isRunning)
+            deviceID,
+            &address,
+            0,
+            nil,
+            &size,
+            &isRunning
+        )
 
         return status == noErr && isRunning != 0
     }
+    private func fetchRecentLogs() {
+        let showProcess = Process()
+        showProcess.executableURL = URL(fileURLWithPath: "/usr/bin/log")
+        showProcess.arguments = [
+            "show",
+            "--style", "syslog",
+            "--last", "2s",
+            "--predicate",
+            "process == 'Music' AND message CONTAINS 'Input format'",
+            "--info",
+        ]
 
+        let pipe = Pipe()
+        showProcess.standardOutput = pipe
+
+        pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            guard !data.isEmpty else { return }
+            self?.processingQueue.async {
+                if let output = String(data: data, encoding: .utf8) {
+                    self?.parseLog(output)
+                }
+            }
+        }
+
+        do {
+            try showProcess.run()
+        } catch {
+            #if DEBUG
+                print("AudioFormatManager: log show start error: \(error)")
+            #endif
+        }
+    }
     private func setupLogProcess() {
         logProcess = Process()
         logProcess?.executableURL = URL(fileURLWithPath: "/usr/bin/log")
@@ -71,7 +117,7 @@ class AudioFormatManager: ObservableObject {
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             guard !data.isEmpty else { return }
-
+            
             self?.processingQueue.async {
                 if let output = String(data: data, encoding: .utf8) {
                     self?.parseLog(output)
@@ -82,9 +128,6 @@ class AudioFormatManager: ObservableObject {
         logProcess?.terminationHandler = { [weak self] process in
             // 确保在主线程或特定队列上更新状态
             DispatchQueue.main.async {
-                print(
-                    "AudioFormatManager: Log process terminated. Exit code: \(process.terminationStatus)"
-                )
                 self?.isMonitoring = false
             }
         }
@@ -93,7 +136,7 @@ class AudioFormatManager: ObservableObject {
             try logProcess?.run()
         } catch {
             #if DEBUG
-            print("AudioFormatManager: Process start error: \(error)")
+                print("AudioFormatManager: Process start error: \(error)")
             #endif
             DispatchQueue.main.async {
                 self.isMonitoring = false  // 启动失败，重置状态
@@ -103,13 +146,6 @@ class AudioFormatManager: ObservableObject {
 
     private func parseLog(_ log: String) {
         let now = Date().timeIntervalSince1970
-        guard log != lastLogEntry || now - lastLogTime > 0.2 else {
-            return  // 忽略短时间内重复日志
-        }
-
-        lastLogEntry = log
-        lastLogTime = now
-
         let pattern = #"(\d+) Hz.*?from (\d+)-bit source"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else {
             return
@@ -117,7 +153,8 @@ class AudioFormatManager: ObservableObject {
 
         let nsLog = log as NSString
         regex.enumerateMatches(
-            in: log, range: NSRange(location: 0, length: nsLog.length)
+            in: log,
+            range: NSRange(location: 0, length: nsLog.length)
         ) { match, _, _ in
             guard let match = match, match.numberOfRanges >= 3 else { return }
 
@@ -125,12 +162,16 @@ class AudioFormatManager: ObservableObject {
             let bitDepth = nsLog.substring(with: match.range(at: 2))
 
             if let sr = Int(sampleRate), let bd = Int(bitDepth) {
+                // 基于解析结果去重
+                if self.currentFormat.sampleRate == sr,
+                   self.currentFormat.bitDepth == bd,
+                   now - self.lastLogTime < 1 {
+                    return
+                }
+                self.lastLogTime = now
+
                 DispatchQueue.main.async {
-                    if self.currentFormat.sampleRate != sr
-                        || self.currentFormat.bitDepth != bd
-                    {
-                        self.currentFormat = (sr, bd)
-                    }
+                    self.currentFormat = (sr, bd)
                 }
             }
         }
@@ -154,7 +195,21 @@ class AudioFormatManager: ObservableObject {
         DispatchQueue.main.async { self.isMonitoring = false }
     }
 
+    deinit {
+        // 清理 Process 资源
+        logProcess?.terminate()
+        logProcess = nil
+    }
+
     private func setNominalSampleRate(_ rate: Int, for device: AudioDeviceID) {
+        let formatter: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSSXXXXX"
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone.current
+            return formatter
+        }()
+
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyNominalSampleRate,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -173,7 +228,7 @@ class AudioFormatManager: ObservableObject {
 
         if status != noErr {
             #if DEBUG
-            print("Sample rate set failed: \(status)")
+                print("Sample rate set failed: \(status)")
             #endif
         }
     }
@@ -211,7 +266,13 @@ class AudioFormatManager: ObservableObject {
         )
 
         let status = AudioObjectGetPropertyData(
-            deviceID, &address, 0, nil, &size, &name)
+            deviceID,
+            &address,
+            0,
+            nil,
+            &size,
+            &name
+        )
         if status == noErr {
             return name as String
         } else {
@@ -222,7 +283,7 @@ class AudioFormatManager: ObservableObject {
         // 先获取设备的所有输出流
         guard let streams = getOutputStreams(for: device) else {
             #if DEBUG
-            print("无法获取输出流")
+                print("无法获取输出流")
             #endif
             return
         }
@@ -235,7 +296,10 @@ class AudioFormatManager: ObservableObject {
 
             // 2. 寻找匹配的格式
             let targetFormat = findMatchingFormat(
-                supportedFormats, depth: depth, rate: currentFormat.sampleRate)
+                supportedFormats,
+                depth: depth,
+                rate: currentFormat.sampleRate
+            )
 
             // 3. 设置物理格式
             var address = AudioObjectPropertyAddress(
@@ -260,7 +324,7 @@ class AudioFormatManager: ObservableObject {
                 )
             } else {
                 #if DEBUG
-                print("设置失败，错误码: \(status)")
+                    print("设置失败，错误码: \(status)")
                 #endif
             }
         }
@@ -287,7 +351,13 @@ class AudioFormatManager: ObservableObject {
         var streams = [AudioStreamID](repeating: 0, count: streamCount)
         guard
             AudioObjectGetPropertyData(
-                device, &address, 0, nil, &dataSize, &streams) == noErr
+                device,
+                &address,
+                0,
+                nil,
+                &dataSize,
+                &streams
+            ) == noErr
         else {
             return nil
         }
@@ -316,10 +386,18 @@ class AudioFormatManager: ObservableObject {
         let formatCount =
             Int(dataSize) / MemoryLayout<AudioStreamRangedDescription>.size
         var formats = [AudioStreamRangedDescription](
-            repeating: AudioStreamRangedDescription(), count: formatCount)
+            repeating: AudioStreamRangedDescription(),
+            count: formatCount
+        )
         guard
             AudioObjectGetPropertyData(
-                stream, &address, 0, nil, &dataSize, &formats) == noErr
+                stream,
+                &address,
+                0,
+                nil,
+                &dataSize,
+                &formats
+            ) == noErr
         else {
             return nil
         }
@@ -329,7 +407,9 @@ class AudioFormatManager: ObservableObject {
 
     // 新增方法：寻找匹配的格式
     private func findMatchingFormat(
-        _ formats: [AudioStreamRangedDescription], depth: Int, rate: Int
+        _ formats: [AudioStreamRangedDescription],
+        depth: Int,
+        rate: Int
     ) -> AudioStreamRangedDescription {
         // 优先寻找完全匹配
         if let exactMatch = formats.first(where: {

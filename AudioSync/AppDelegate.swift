@@ -88,6 +88,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
                 #if DEBUG
                 print("歌词")
+                print(viewModel.isViewLyricsShow)
                 #endif
 
                 if trackInfo.state == .playing {
