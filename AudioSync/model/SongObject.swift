@@ -40,9 +40,7 @@ extension SongObject {
         do {
             try context.save()
         } catch {
-            #if DEBUG
-            print("保存 SongObject 失败：\(error)")
-            #endif
+            Log.general.error("保存 coreData 失败：\(error)")
         }
     }
 
@@ -55,9 +53,7 @@ extension SongObject {
         do {
             return try context.fetch(request).first
         } catch {
-            #if DEBUG
-            print("根据 ID 获取 SongObject 失败：\(error)")
-            #endif
+            Log.general.error("根据 id = \(id) 获取 coreData 失败：\(error)")
             return nil
         }
     }
@@ -69,15 +65,11 @@ extension SongObject {
         do {
             if let song = try context.fetch(request).first {
                 context.delete(song)
-                #if DEBUG
-                print("删除缓存: \(song.trackName) - \(song.id)")
-                #endif
+                Log.general.info("删除缓存: \(song.trackName) - \(song.id)")
                 try context.save()
             }
         } catch {
-            #if DEBUG
-            print("删除指定 ID 的 SongObject 失败：\(error)")
-            #endif
+            Log.general.error("删除 id = \(id) 的 coreData 失败：\(error)")
         }
     }
 
@@ -90,9 +82,7 @@ extension SongObject {
             }
             try context.save()
         } catch {
-            #if DEBUG
-            print("删除所有 SongObject 失败：\(error)")
-            #endif
+            Log.general.error("删除所有 coreData 失败：\(error)")
         }
     }
     @nonobjc public class func typedFetchRequest() -> NSFetchRequest<SongObject>

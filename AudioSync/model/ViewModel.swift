@@ -37,15 +37,9 @@ class ViewModel: ObservableObject {
 
     private func lyricUpdater() async throws {
         repeat {
-            #if DEBUG
-                print(
-                    "lyric index: \(String(describing: currentlyPlayingLyricsIndex))"
-                )
-            #endif
+            Log.general.info("lyric index: \(String(describing: self.currentlyPlayingLyricsIndex))")
             guard let playerPosition = appleMusicScript?.playerPosition else {
-                #if DEBUG
-                    print("no player position hence stopped")
-                #endif
+                Log.general.info("no player position hence stopped")
                 // pauses the timer bc there's no player position
                 stopLyricUpdater()
                 return
@@ -67,15 +61,9 @@ class ViewModel: ObservableObject {
 
             let nextTimestamp = currentlyPlayingLyrics[lastIndex].startTimeMS
             let diff = nextTimestamp - currentTime
-            #if DEBUG
-                print("current time: \(currentTime)")
-                print("next time: \(nextTimestamp)")
-                print("the difference is \(diff)")
-            #endif
+            Log.general.info("current time: \(currentTime). next time: \(nextTimestamp). the difference is \(diff)")
             try await Task.sleep(nanoseconds: UInt64(1_000_000 * diff))
-            #if DEBUG
-                print("last index: \(lastIndex)")
-            #endif
+            Log.general.info("last index: \(lastIndex)")
             if currentlyPlayingLyrics.count > lastIndex {
                 withAnimation(.linear(duration: 0.2)) {
                     currentlyPlayingLyricsIndex = lastIndex
@@ -83,37 +71,25 @@ class ViewModel: ObservableObject {
             } else {
                 currentlyPlayingLyricsIndex = nil
             }
-            #if DEBUG
-                print(
-                    "current lyrics index is now \(currentlyPlayingLyricsIndex?.description )"
-                )
-            #endif
+            Log.general.info("current lyrics index is now \(String(describing: self.currentlyPlayingLyricsIndex))")
         } while !Task.isCancelled
     }
 
     func startLyricUpdater() {
-        #if DEBUG
-            print("start update task")
-            print(
-                "isViewLyricsShow: \(self.isViewLyricsShow), lyrics.isEmpty: \(currentlyPlayingLyrics.isEmpty)"
-            )
-        #endif
+        Log.general.info("start update task")
+        Log.general.info("isViewLyricsShow: \(self.isViewLyricsShow), lyrics.isEmpty: \(self.currentlyPlayingLyrics.isEmpty)")
         currentLyricsUpdaterTask?.cancel()
         currentLyricsUpdaterTask = Task {
             do {
                 try await lyricUpdater()
             } catch {
-                #if DEBUG
-                    print("lyrics were canceled \(error)")
-                #endif
+                Log.general.info("lyric updater were canceled \(error)")
             }
         }
     }
 
     func stopLyricUpdater() {
-        #if DEBUG
-            print("stop update task")
-        #endif
+        Log.general.info("stop lyric updater")
 //        currentlyPlayingLyricsIndex = nil
 //        isLyricsPrepared = false
         currentLyricsUpdaterTask?.cancel()
@@ -123,9 +99,7 @@ class ViewModel: ObservableObject {
         if let currentlyPlayingLyricsIndex {
             let newIndex = currentlyPlayingLyricsIndex + 1
             if newIndex >= currentlyPlayingLyrics.count {
-                #if DEBUG
-                    print("REACHED LAST LYRIC!!!!!!!!")
-                #endif
+                Log.general.warning("⚠️ REACHED LAST LYRIC!!!!!!!!")
                 // if current time is before our current index's start time, the user has scrubbed and rewinded
                 // reset into linear search mode
                 if currentTime
@@ -142,9 +116,7 @@ class ViewModel: ObservableObject {
                 .startTimeMS,
                 currentTime < currentlyPlayingLyrics[newIndex].startTimeMS
             {
-                #if DEBUG
-                    print("just the next lyric")
-                #endif
+                Log.general.info("just the next lyric")
                 return newIndex
             }
         }

@@ -143,15 +143,15 @@ struct QQLyrics: Decodable {
     let lyric: Data
     let trans: Data?
 }
-struct QQAlbum: Decodable{
+struct QQAlbum: Decodable, Encodable{
     let code: Int
     let data:Album
-    struct Album: Decodable {
+    struct Album: Decodable, Encodable {
         let album_id:String?
         let album_mid: String
         let album_name: String?
         let headpiclist: [Headpiclist]
-        struct Headpiclist: Decodable{
+        struct Headpiclist: Decodable, Encodable{
             let picurl: String
         }
     }
@@ -172,7 +172,7 @@ extension QQLyrics {
     }
 }
 
-struct OriginalName: Decodable {
+struct OriginalName: Decodable, Encodable {
     let trackName: String
     let artist: String
     let album: String

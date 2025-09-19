@@ -5,23 +5,26 @@ class AudioFormatManager: ObservableObject {
     static let shared: AudioFormatManager = AudioFormatManager()
     @Published var sampleRate: Int?
     @Published var bitDepth: Int?
-
+    @Published var trackCheck: [NSNumber: Bool] = [:]
+    var needChange: Bool = true
     var currentFormat: (sampleRate: Int, bitDepth: Int) = (0, 0) {
         didSet {
             // 避免不必要的更新，如果值没有实际变化
             if oldValue.sampleRate != currentFormat.sampleRate
                 || oldValue.bitDepth != currentFormat.bitDepth
             {
-                print(
-                    "currentFormat changed from (\(oldValue.sampleRate), \(oldValue.bitDepth)) to (\(currentFormat.sampleRate), \(currentFormat.bitDepth))"
-                )
+                Log.backend.info("currentFormat changed from (\(oldValue.sampleRate), \(oldValue.bitDepth)) to (\(self.currentFormat.sampleRate), \(self.currentFormat.bitDepth))")
                 sampleRate = currentFormat.sampleRate
                 bitDepth = currentFormat.bitDepth
-                onFormatUpdate?(
-                    currentFormat.sampleRate,
-                    currentFormat.bitDepth
-                )
+                needChange  = true
+            } else {
+                Log.backend.info("currentFormat no change")
+                needChange = false
             }
+            onFormatUpdate?(
+                currentFormat.sampleRate,
+                currentFormat.bitDepth
+            )
         }
     }
     var onFormatUpdate: ((Int, Int) -> Void)?
@@ -41,7 +44,7 @@ class AudioFormatManager: ObservableObject {
     func startMonitoring() {
         guard !isMonitoring else { return }
         isMonitoring = true
-
+        Log.backend.info("start log monitoring")
         // 先抓过去 5 秒的历史日志，避免漏掉启动前的 Input format
         fetchRecentLogs()
 
@@ -74,7 +77,7 @@ class AudioFormatManager: ObservableObject {
         showProcess.arguments = [
             "show",
             "--style", "syslog",
-            "--last", "2s",
+            "--last", "1s",
             "--predicate",
             "process == 'Music' AND message CONTAINS 'Input format'",
             "--info",
@@ -96,9 +99,7 @@ class AudioFormatManager: ObservableObject {
         do {
             try showProcess.run()
         } catch {
-            #if DEBUG
-                print("AudioFormatManager: log show start error: \(error)")
-            #endif
+            Log.backend.error("AudioFormatManager: fetchRecentLogs   error: \(error)")
         }
     }
     private func setupLogProcess() {
@@ -135,9 +136,7 @@ class AudioFormatManager: ObservableObject {
         do {
             try logProcess?.run()
         } catch {
-            #if DEBUG
-                print("AudioFormatManager: Process start error: \(error)")
-            #endif
+            Log.backend.error("AudioFormatManager: setupLogProcess   error: \(error)")
             DispatchQueue.main.async {
                 self.isMonitoring = false  // 启动失败，重置状态
             }
@@ -152,6 +151,7 @@ class AudioFormatManager: ObservableObject {
         }
 
         let nsLog = log as NSString
+        Log.backend.info("Music Format log: \(nsLog)")
         regex.enumerateMatches(
             in: log,
             range: NSRange(location: 0, length: nsLog.length)
@@ -177,7 +177,10 @@ class AudioFormatManager: ObservableObject {
         }
     }
 
-    func updateOutputFormat() {
+    func updateOutputFormat()  {
+        if !needChange {
+            return
+        }
         guard let deviceID = getDefaultOutputDevice(),
             deviceID != kAudioObjectUnknown
         else {
@@ -190,6 +193,7 @@ class AudioFormatManager: ObservableObject {
 
     func stopMonitoring() {
         guard isMonitoring else { return }
+        Log.backend.info("stop log monitoring")
         logProcess?.terminate()
         logProcess = nil
         DispatchQueue.main.async { self.isMonitoring = false }
@@ -202,14 +206,7 @@ class AudioFormatManager: ObservableObject {
     }
 
     private func setNominalSampleRate(_ rate: Int, for device: AudioDeviceID) {
-        let formatter: DateFormatter = {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSSXXXXX"
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            formatter.timeZone = TimeZone.current
-            return formatter
-        }()
-
+        
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyNominalSampleRate,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -227,9 +224,7 @@ class AudioFormatManager: ObservableObject {
         )
 
         if status != noErr {
-            #if DEBUG
-                print("Sample rate set failed: \(status)")
-            #endif
+            Log.backend.error("Sample rate set  \(status)")
         }
     }
 
@@ -282,9 +277,7 @@ class AudioFormatManager: ObservableObject {
     private func setStreamBitDepth(_ depth: Int, for device: AudioDeviceID) {
         // 先获取设备的所有输出流
         guard let streams = getOutputStreams(for: device) else {
-            #if DEBUG
-                print("无法获取输出流")
-            #endif
+            Log.backend.error("无法获取输出流")
             return
         }
 
@@ -319,13 +312,10 @@ class AudioFormatManager: ObservableObject {
             )
 
             if status == noErr {
-                print(
-                    "成功设置流 \(stream) 格式：\(format.mBitsPerChannel)bit/\(format.mSampleRate)Hz"
-                )
+                let deviceName = getDeviceName(device) as NSString? ?? "Unknown Device"
+                Log.backend.info("成功为「\(deviceName)」同步格式：\(format.mBitsPerChannel)bit/\(format.mSampleRate)Hz")
             } else {
-                #if DEBUG
-                    print("设置失败，错误码: \(status)")
-                #endif
+                Log.backend.error("设置失败 - \(status)")
             }
         }
     }
@@ -418,7 +408,13 @@ class AudioFormatManager: ObservableObject {
         }) {
             return exactMatch
         }
-
+        let simplifiedFormats = formats.map { format in
+            [
+                "sampleRate": format.mFormat.mSampleRate,
+                "bitDepth": format.mFormat.mBitsPerChannel
+            ]
+        }
+        Log.backend.info("从\(JSON.stringify(simplifiedFormats))中未找到匹配「\(depth)Bit \(rate)kHz」的输出格式")
         // 次选：匹配采样率，使用更高位深
         if let rateMatch = formats.filter({
             Int($0.mFormat.mSampleRate) == rate

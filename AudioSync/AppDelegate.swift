@@ -30,9 +30,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if let error = error {
                 fatalError("❌ CoreData 加载失败: \(error)")
             } else {
-                #if DEBUG
-                    print("✅ CoreData 加载成功: \(description)")
-                #endif
+                Log.backend.info("✅ CoreData 加载成功: \(description)")
             }
         }
         coreDataContainer.viewContext.automaticallyMergesChangesFromParent =
@@ -44,7 +42,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
 
         NSApp.setActivationPolicy(.accessory)
-//        registerMetalShaders()
+        //        registerMetalShaders()
         playbackNotifier = PlaybackNotifier()
         Task { @MainActor in
             self.networkUtil = NetworkUtil(viewModel: self.viewModel)
@@ -52,9 +50,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 .removeDuplicates()
                 .sink { [weak self] isShowLyrics in
                     guard let self = self else { return }
-                    #if DEBUG
-                        print("监听 isShowLyrics 变化: \(isShowLyrics)")
-                    #endif
+                    Log.general.info("显示歌词 -> \(isShowLyrics)")
                     if isShowLyrics {
                         playbackNotifier?.scriptNotification()
                     } else {
@@ -69,43 +65,51 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 添加播放通知回调逻辑
-        playbackNotifier?.onPlay = { [weak self] trackInfo in
+        playbackNotifier?.onPlay = { [weak self] trackInfo, trigger in
             // 采样率和位深同步
-            Task {
-                guard trackInfo.state == .playing else { return }
-                self?.audioManager.onFormatUpdate = {
-                    [weak self] sampleRate, bitDepth in
-                    self?.audioManager.updateOutputFormat()
-                }
-                self?.audioManager.startMonitoring()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    self?.audioManager.stopMonitoring()
+            if trigger == .notification {
+                await withCheckedContinuation { continuation in
+                    var didResume = false
+                    Task {
+                        self?.audioManager.onFormatUpdate = {
+                            [weak self] sampleRate, bitDepth in
+                            self?.audioManager.updateOutputFormat()
+                            if !didResume {
+                                didResume = true
+                                continuation.resume()
+                            }
+                        }
+                        self?.audioManager.startMonitoring()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                            if !didResume {
+                                didResume = true
+                                continuation.resume()
+                            }
+                            self?.audioManager.stopMonitoring()
+                        }
+
+                    }
                 }
             }
             // 歌词
             Task { [weak self] in
                 guard let self else { return }
+                guard viewModel.isViewLyricsShow else { return }
+                
 
-                #if DEBUG
-                print("歌词")
-                print(viewModel.isViewLyricsShow)
-                #endif
-
-                if trackInfo.state == .playing {
-                    viewModel.isCurrentTrackPlaying = true
-                } else {
-                    viewModel.isCurrentTrackPlaying = false
-                    viewModel.stopLyricUpdater()
-                    return
-                }
+                                if trackInfo.state == .playing {
+                                    viewModel.isCurrentTrackPlaying = true
+                                } else {
+                                    viewModel.isCurrentTrackPlaying = false
+                                    viewModel.stopLyricUpdater()
+                                    return
+                                }
 
                 // 若为同一首歌且已有歌词，不处理
                 if viewModel.currentTrack?.trackID == trackInfo.trackID,
-                   !viewModel.currentlyPlayingLyrics.isEmpty {
+                    !viewModel.currentlyPlayingLyrics.isEmpty
+                {
                     viewModel.startLyricUpdater()
-                    #if DEBUG
-                    print("歌曲已准备好,跳过处理")
-                    #endif
                     return
                 }
 
@@ -114,26 +118,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 viewModel.currentlyPlayingLyricsIndex = nil
                 viewModel.stopLyricUpdater()
 
-                guard viewModel.isViewLyricsShow else { return }
+                
                 let context = coreDataContainer.viewContext
                 context.refreshAllObjects()
-
+                viewModel.isCurrentTrackPlaying = true
+                viewModel.startLyricUpdater()
                 if loadLyricsFromLocal(trackInfo: trackInfo, context: context) {
                     return
                 }
 
-                await loadLyricsFromNetwork(trackInfo: trackInfo, context: context)
+                await loadLyricsFromNetwork(
+                    trackInfo: trackInfo,
+                    context: context
+                )
 
             }
         }
     }
-    private func loadLyricsFromLocal(trackInfo: TrackInfo, context: NSManagedObjectContext) -> Bool {
-        if let songObject = SongObject.fetchSong(byID: trackInfo.trackID, context: context) {
+    private func loadLyricsFromLocal(
+        trackInfo: TrackInfo,
+        context: NSManagedObjectContext
+    ) -> Bool {
+        if let songObject = SongObject.fetchSong(
+            byID: trackInfo.trackID,
+            context: context
+        ) {
             let localLyrics = songObject.getLyrics()
             if !localLyrics.isEmpty {
-                #if DEBUG
-                print("本地歌词")
-                #endif
+                Log.general.info("本地歌词")
                 viewModel.currentlyPlayingLyrics = localLyrics
                 viewModel.currentAlbumColor = trackInfo.color ?? []
                 viewModel.startLyricUpdater()
@@ -142,16 +154,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         return false
     }
-    
-    private func loadLyricsFromNetwork(trackInfo: TrackInfo, context: NSManagedObjectContext) async {
+
+    private func loadLyricsFromNetwork(
+        trackInfo: TrackInfo,
+        context: NSManagedObjectContext
+    ) async {
         do {
             let trackName = trackInfo.name
             let artist = trackInfo.artist
 
             guard !trackName.isEmpty, !artist.isEmpty else {
-                #if DEBUG
-                print("原始标题或艺术家为空，跳过歌词请求")
-                #endif
+                Log.general.warning("⚠️ 原始标题或艺术家为空，跳过歌词请求")
                 return
             }
 
@@ -161,11 +174,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 trackID: trackInfo.trackID,
                 album: trackInfo.album,
                 genre: trackInfo.genre
-            ), !lyrics.isEmpty{
+            ), !lyrics.isEmpty {
                 let finishLyrics = finishLyric(lyrics)
-                #if DEBUG
-                print("网络歌词")
-                #endif
+                Log.general.info("网络歌词")
 
                 viewModel.currentlyPlayingLyrics = finishLyrics
                 viewModel.currentAlbumColor = trackInfo.color ?? []
@@ -180,16 +191,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
         } catch {
-            #if DEBUG
-            print("网络歌词获取失败: \(error)")
-            #endif
+            Log.general.error("网络歌词获取失败: \(error)")
         }
     }
-    
+
     func finishLyric(_ rawLyrics: [LyricLine]) -> [LyricLine] {
         guard let last = rawLyrics.last else { return rawLyrics }
         let virtualEndLine = LyricLine(
-            startTime: last.startTimeMS + 5000, words: "")
+            startTime: last.startTimeMS + 5000,
+            words: ""
+        )
         return rawLyrics + [virtualEndLine]
     }
 
@@ -214,14 +225,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             guard let manualName = NSPasteboard.general.string(forType: .string)
             else {
-                #if DEBUG
-                    print("⚠️ 粘贴板中没有字符串内容")
-                #endif
+                Log.general.warning("⚠️ 粘贴板中没有字符串内容")
                 return
             }
-            #if DEBUG
-                print("粘贴板: \(manualName)")
-            #endif
+            Log.general.info("来自粘贴板的歌曲: \(manualName)")
             guard let currentTrack = playbackNotifier?.fetchCurrentTrack()
             else {
                 return
@@ -239,17 +246,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if !netEaseLyrics!.isEmpty {
                 let finishLyrics = finishLyric(netEaseLyrics!)
                 SongObject.deleteSong(
-                    byID: currentTrack.trackID, context: context)
+                    byID: currentTrack.trackID,
+                    context: context
+                )
                 SongObject.saveSong(
-                    id: currentTrack.trackID, trackName: manualName,
-                    lyrics: finishLyrics, in: context)
+                    id: currentTrack.trackID,
+                    trackName: manualName,
+                    lyrics: finishLyrics,
+                    in: context
+                )
                 playbackNotifier?.scriptNotification()
             }
 
         } catch {
-            #if DEBUG
-                print("粘贴板获取歌词失败：\(error)")
-            #endif
+            Log.general.error("粘贴板获取歌词失败：\(error)")
         }
     }
 

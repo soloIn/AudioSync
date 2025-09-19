@@ -2,7 +2,8 @@ import AppKit
 import CoreAudio
 import ScriptingBridge
 import SwiftUI
-struct TrackInfo {
+
+struct TrackInfo: Encodable {
     let name: String
     let artist: String
     let albumArtist: String
@@ -12,17 +13,36 @@ struct TrackInfo {
     let genre: String
     let color: [Color]?
     let albumCover: NSImage?
+    enum CodingKeys: String, CodingKey {
+            case name, artist, albumArtist, trackID, album, state, genre
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(name, forKey: .name)
+            try container.encode(artist, forKey: .artist)
+            try container.encode(albumArtist, forKey: .albumArtist)
+            try container.encode(trackID, forKey: .trackID)
+            try container.encode(album, forKey: .album)
+            try container.encode(state, forKey: .state)
+            try container.encode(genre, forKey: .genre)
+        }
 }
-enum PlayState {
+enum PlayState: String, Encodable {
     case playing
     case stop
 }
-
+enum PlaybackTrigger {
+    case notification
+    case script
+}
 class PlaybackNotifier {
-    var onPlay: ((TrackInfo) -> Void)?
+    var onPlay: ((TrackInfo, PlaybackTrigger) async -> Void)?
 
     private lazy var appleMusicScript: MusicApplication? = SBApplication(
-        bundleIdentifier: "com.apple.Music")
+        bundleIdentifier: "com.apple.Music"
+    )
+    var audioManager = AudioFormatManager.shared
 
     init() {
         DistributedNotificationCenter.default().addObserver(
@@ -41,43 +61,45 @@ class PlaybackNotifier {
         _ notification: Notification
     ) {
         guard let userInfo = notification.userInfo,
-            let name = userInfo["Name"] as? String,
             let state = userInfo["Player State"] as? String
         else {
-            print(
-                "appleNotification:  userInfo is missing required fields.")
+            Log.backend.error(
+                "appleNotification:  userInfo is missing required fields."
+            )
             return
         }
-        print("appleNotification: \(userInfo)")
 
-        Task {
-            guard let scriptTrack = await fetchCurrentTrackWithRetry()
-            else {
-                print(
-                    "appleMusicScript: Failed to retrieve complete track information "
-                )
-                return
+        Log.backend.info("appleNotification userInfo: \(userInfo)")
+        let persistentID = userInfo["PersistentID"] as? NSNumber ?? 1
+        Task { @MainActor in
+            if state == "Playing"
+                && !(audioManager.trackCheck[persistentID] ?? false)
+            {
+                audioManager.trackCheck.updateValue(true, forKey: persistentID)
+                let script = appleMusicScript
+                script?.pause?()
+                Log.backend.info("pause...")
+                guard let trackInfo = await fetchCurrentTrackWithRetry() else {
+                    script?.playpause?()
+                    return
+                }
+                if let onPlay = onPlay {
+                    await onPlay(trackInfo, .notification)  // 等待执行完
+                }
+                Log.backend.info("play...")
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    script?.playpause?()
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    [weak self] in
+                    self?.audioManager.trackCheck.removeValue(
+                        forKey: persistentID
+                    )
+
+                }
             }
-            let trackInfo = TrackInfo(
-                name: name,
-                artist: userInfo["Artist"] as? String ?? "",
-                albumArtist: userInfo["Album Artist"] as? String ?? "",
-                trackID: scriptTrack.trackID,
-                album: userInfo["Album"] as? String ?? "",
-                state: state == "Playing" ? .playing : .stop,
-                genre: userInfo["Genre"] as? String ?? "",
-                color: scriptTrack.color,
-                albumCover: scriptTrack.albumCover
-            )
-
-            #if DEBUG
-
-            print("appleNotification：\(trackInfo)")
-
-            #endif
-            onPlay?(trackInfo)
         }
-        
     }
 
     func scriptNotification() {
@@ -85,12 +107,12 @@ class PlaybackNotifier {
             return
         }
 
-        #if DEBUG
-
-        print("scriptNotification: \(track)")
-
-        #endif
-        onPlay?(track)
+        Log.backend.info("scriptNotification track: \(JSON.stringify(track))")
+        Task {
+            if let onPlay = onPlay {
+                await onPlay(track, .script)  // 等待执行完
+            }
+        }
     }
     func stringFromPlayerState(_ state: MusicEPlS) -> PlayState {
         switch state {
@@ -107,33 +129,39 @@ class PlaybackNotifier {
             let artworkData =
                 (trackInfo.artworks?().firstObject as? MusicArtwork)?.data
         else {  // 安全访问 playerState
-            #if DEBUG
-            print("appleMusicScript: Failed to retrieve current track")
-            #endif
+            Log.backend.error("appleMusicScript: Failed to retrieve current track")
             return nil
         }
 
         let track = TrackInfo(
-            name: trackInfo.name ?? "", artist: trackInfo.artist ?? "",
+            name: trackInfo.name ?? "",
+            artist: trackInfo.artist ?? "",
             albumArtist: trackInfo.albumArtist ?? "",
-            trackID: persistentID, album: trackInfo.album ?? "",
-            state: stringFromPlayerState(state), genre: trackInfo.genre ?? "",
-            color: artworkData.findDominantColors(), albumCover: artworkData)
+            trackID: persistentID,
+            album: trackInfo.album ?? "",
+            state: stringFromPlayerState(state),
+            genre: trackInfo.genre ?? "",
+            color: artworkData.findDominantColors(),
+            albumCover: artworkData
+        )
         return track
     }
+    
     func fetchCurrentTrackWithRetry(
         maxRetryCount: Int = 3,
         delaySeconds: Double = 0.5
     ) async -> TrackInfo? {
         for attempt in 1...maxRetryCount {
-            if let track =  fetchCurrentTrack() {
+            if let track = fetchCurrentTrack() {
                 return track
             } else {
                 if attempt < maxRetryCount {
-                    print("第 \(attempt) 次尝试失败，\(delaySeconds) 秒后重试...")
-                    try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+                    Log.backend.error("第 \(attempt) 次尝试失败，\(delaySeconds) 秒后重试...")
+                    try? await Task.sleep(
+                        nanoseconds: UInt64(delaySeconds * 1_000_000_000)
+                    )
                 } else {
-                    print("达到最大重试次数，放弃。")
+                    Log.backend.error("达到最大重试次数，放弃。")
                 }
             }
         }

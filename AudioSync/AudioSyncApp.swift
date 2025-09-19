@@ -136,9 +136,7 @@ struct AudioSyncApp: App {
         .onChange(
             of: isFullScreenVisible,
             {
-                #if DEBUG
-                print("isFullScreenVisible change: \(isFullScreenVisible)")
-                #endif
+                Log.ui.info("isFullScreenVisible change: \(isFullScreenVisible)")
                 viewModel.isViewLyricsShow = isKaraokeVisible || isFullScreenVisible
                 if isFullScreenVisible {
                     openWindow(id: "fullScreen")
@@ -151,9 +149,7 @@ struct AudioSyncApp: App {
         .onChange(
             of: isKaraokeVisible,
             {
-                #if DEBUG
-                print("isKaraokeVisible change: \(isKaraokeVisible)")
-                #endif
+                Log.ui.info("isKaraokeVisible change: \(isKaraokeVisible)")
                 viewModel.isViewLyricsShow = isKaraokeVisible || isFullScreenVisible
                 CreateKaraoke()
             })
