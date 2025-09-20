@@ -74,6 +74,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         self?.audioManager.onFormatUpdate = {
                             [weak self] sampleRate, bitDepth in
                             self?.audioManager.updateOutputFormat()
+                            self?.playbackNotifier?.scriptNotification()
                             if !didResume {
                                 didResume = true
                                 continuation.resume()

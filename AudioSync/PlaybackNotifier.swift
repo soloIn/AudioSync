@@ -80,6 +80,7 @@ class PlaybackNotifier {
                 script?.pause?()
                 Log.backend.info("pause...")
                 guard let trackInfo = await fetchCurrentTrackWithRetry() else {
+                    script?.setPlayerPosition?(0.0)
                     script?.playpause?()
                     return
                 }
