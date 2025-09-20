@@ -80,7 +80,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                             }
                         }
                         self?.audioManager.startMonitoring()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
                             if !didResume {
                                 didResume = true
                                 continuation.resume()

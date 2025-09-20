@@ -21,6 +21,7 @@ class AudioFormatManager: ObservableObject {
                 Log.backend.info("currentFormat no change")
                 needChange = false
             }
+            self.stopMonitoring()
             onFormatUpdate?(
                 currentFormat.sampleRate,
                 currentFormat.bitDepth
@@ -32,6 +33,7 @@ class AudioFormatManager: ObservableObject {
     // 保持原有日志监控和格式设置逻辑...
     // [原有代码的私有属性和方法保持不变]
     private var logProcess: Process?
+    private var logPipe: Pipe?
     private var isMonitoring = false
     private let processingQueue = DispatchQueue(
         label: "com.audio.format.monitor",
@@ -45,7 +47,7 @@ class AudioFormatManager: ObservableObject {
         guard !isMonitoring else { return }
         isMonitoring = true
         Log.backend.info("start log monitoring")
-        // 先抓过去 5 秒的历史日志，避免漏掉启动前的 Input format
+        // 先抓过去 1 秒的历史日志，避免漏掉启动前的 Input format
         fetchRecentLogs()
 
         setupLogProcess()
@@ -72,47 +74,49 @@ class AudioFormatManager: ObservableObject {
         return status == noErr && isRunning != 0
     }
     private func fetchRecentLogs() {
-        let showProcess = Process()
-        showProcess.executableURL = URL(fileURLWithPath: "/usr/bin/log")
-        showProcess.arguments = [
-            "show",
-            "--style", "syslog",
-            "--last", "1s",
-            "--predicate",
-            "process == 'Music' AND message CONTAINS 'Input format'",
-            "--info",
-        ]
+            // 在后台队列中执行，避免阻塞主线程
+            processingQueue.async { [weak self] in
+                let showProcess = Process()
+                showProcess.executableURL = URL(fileURLWithPath: "/usr/bin/log")
+                showProcess.arguments = [
+                    "show",
+                    "--style", "syslog",
+                    "--last", "1s",
+                    "--predicate",
+                    "process == 'Music' AND message CONTAINS 'Input format' AND message CONTAINS 'source'",
+                    "--info",
+                ]
 
-        let pipe = Pipe()
-        showProcess.standardOutput = pipe
+                let pipe = Pipe()
+                showProcess.standardOutput = pipe
 
-        pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty else { return }
-            self?.processingQueue.async {
-                if let output = String(data: data, encoding: .utf8) {
-                    self?.parseLog(output)
+                do {
+                    try showProcess.run()
+                    
+                    // 同步读取所有输出数据，直到进程结束
+                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    showProcess.waitUntilExit() // 确保进程已完全终止
+
+                    if let output = String(data: data, encoding: .utf8), !output.isEmpty {
+                        self?.parseLog(output)
+                    }
+                } catch {
+                    Log.backend.error("AudioFormatManager: fetchRecentLogs error: \(error)")
                 }
             }
         }
-
-        do {
-            try showProcess.run()
-        } catch {
-            Log.backend.error("AudioFormatManager: fetchRecentLogs   error: \(error)")
-        }
-    }
     private func setupLogProcess() {
         logProcess = Process()
         logProcess?.executableURL = URL(fileURLWithPath: "/usr/bin/log")
         logProcess?.arguments = [
             "stream",
             "--predicate",
-            "process == 'Music' AND message CONTAINS 'Input format'",
+            "process == 'Music' AND message CONTAINS 'Input format' AND message CONTAINS 'source'",
             "--info",
         ]
 
         let pipe = Pipe()
+        self.logPipe = pipe
         logProcess?.standardOutput = pipe
 
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
@@ -127,11 +131,12 @@ class AudioFormatManager: ObservableObject {
         }
 
         logProcess?.terminationHandler = { [weak self] process in
-            // 确保在主线程或特定队列上更新状态
-            DispatchQueue.main.async {
-                self?.isMonitoring = false
-            }
-        }
+                    DispatchQueue.main.async {
+                        if self?.isMonitoring == true { // 仅在仍在监控状态时重置
+                            self?.isMonitoring = false
+                        }
+                    }
+                }
 
         do {
             try logProcess?.run()
@@ -194,9 +199,19 @@ class AudioFormatManager: ObservableObject {
     func stopMonitoring() {
         guard isMonitoring else { return }
         Log.backend.info("stop log monitoring")
-        logProcess?.terminate()
-        logProcess = nil
-        DispatchQueue.main.async { self.isMonitoring = false }
+        // 1. 清理流式监控的 handler
+                logPipe?.fileHandleForReading.readabilityHandler = nil
+                
+                // 2. 终止流式监控的进程
+                if logProcess?.isRunning == true {
+                     logProcess?.terminate()
+                }
+               
+                // 3. 释放资源引用
+                logProcess = nil
+                logPipe = nil
+
+                DispatchQueue.main.async { self.isMonitoring = false }
     }
 
     deinit {
