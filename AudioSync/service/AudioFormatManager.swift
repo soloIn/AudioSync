@@ -5,7 +5,9 @@ class AudioFormatManager: ObservableObject {
     static let shared: AudioFormatManager = AudioFormatManager()
     @Published var sampleRate: Int?
     @Published var bitDepth: Int?
-    @Published var trackCheck: [NSNumber: Bool] = [:]
+    @Published var isSameAlbum: [String: Bool] = [:]
+    @Published var lastAlbum: String?
+
     var needChange: Bool = true
     var currentFormat: (sampleRate: Int, bitDepth: Int) = (0, 0) {
         didSet {

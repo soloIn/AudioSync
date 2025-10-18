@@ -93,46 +93,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             // 歌词
-            Task { [weak self] in
-                guard let self else { return }
-                guard viewModel.isViewLyricsShow else { return }
-                
+            if trigger == .script {
+                Task { [weak self] in
+                    guard let self else { return }
+                    guard viewModel.isViewLyricsShow else { return }
+                    guard let scriptTrackInfo = trackInfo else {return}
 
-                                if trackInfo.state == .playing {
-                                    viewModel.isCurrentTrackPlaying = true
-                                } else {
-                                    viewModel.isCurrentTrackPlaying = false
-                                    viewModel.stopLyricUpdater()
-                                    return
-                                }
+                                    if scriptTrackInfo.state == .playing {
+                                        viewModel.isCurrentTrackPlaying = true
+                                    } else {
+                                        viewModel.isCurrentTrackPlaying = false
+                                        viewModel.stopLyricUpdater()
+                                        return
+                                    }
 
-                // 若为同一首歌且已有歌词，不处理
-                if viewModel.currentTrack?.trackID == trackInfo.trackID,
-                    !viewModel.currentlyPlayingLyrics.isEmpty
-                {
+                    // 若为同一首歌且已有歌词，不处理
+                    if viewModel.currentTrack?.trackID == scriptTrackInfo.trackID,
+                        !viewModel.currentlyPlayingLyrics.isEmpty
+                    {
+                        viewModel.startLyricUpdater()
+                        return
+                    }
+
+                    viewModel.currentTrack = trackInfo
+                    viewModel.currentlyPlayingLyrics = []
+                    viewModel.currentlyPlayingLyricsIndex = nil
+                    viewModel.stopLyricUpdater()
+
+                    
+                    let context = coreDataContainer.viewContext
+                    context.refreshAllObjects()
+                    viewModel.isCurrentTrackPlaying = true
                     viewModel.startLyricUpdater()
-                    return
+                    if loadLyricsFromLocal(trackInfo: scriptTrackInfo, context: context) {
+                        return
+                    }
+
+                    await loadLyricsFromNetwork(
+                        trackInfo: scriptTrackInfo,
+                        context: context
+                    )
+
                 }
-
-                viewModel.currentTrack = trackInfo
-                viewModel.currentlyPlayingLyrics = []
-                viewModel.currentlyPlayingLyricsIndex = nil
-                viewModel.stopLyricUpdater()
-
-                
-                let context = coreDataContainer.viewContext
-                context.refreshAllObjects()
-                viewModel.isCurrentTrackPlaying = true
-                viewModel.startLyricUpdater()
-                if loadLyricsFromLocal(trackInfo: trackInfo, context: context) {
-                    return
-                }
-
-                await loadLyricsFromNetwork(
-                    trackInfo: trackInfo,
-                    context: context
-                )
-
             }
         }
     }

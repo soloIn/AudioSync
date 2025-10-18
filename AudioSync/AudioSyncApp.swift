@@ -113,10 +113,7 @@ struct AudioSyncApp: App {
                     .keyboardShortcut("d")
                 Divider()
                 Button("剪贴板读取原始歌曲名", action: appDelegate.manualNamefetch)
-                Divider()
-                Button("在访达显示日志"){
-                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: AppLogger.finder)
-                }
+                
                 Divider()
                 Button("退出") {
                     NSApplication.shared.terminate(nil)

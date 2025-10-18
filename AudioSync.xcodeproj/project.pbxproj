@@ -8,42 +8,63 @@
 
 /* Begin PBXBuildFile section */
 		F808FE022DD8B57F0041F8CA /* Regex in Frameworks */ = {isa = PBXBuildFile; productRef = F808FE012DD8B57F0041F8CA /* Regex */; };
+		F85F5BD32E82694D00EFD18F /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F85F5BBF2E82694D00EFD18F /* Preview Assets.xcassets */; };
+		F85F5BD42E82694D00EFD18F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F85F5BC42E82694D00EFD18F /* Assets.xcassets */; };
+		F85F5BD62E82694D00EFD18F /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BB72E82694D00EFD18F /* Extensions.swift */; };
+		F85F5BD72E82694D00EFD18F /* LyricsHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BB82E82694D00EFD18F /* LyricsHeader.swift */; };
+		F85F5BD82E82694D00EFD18F /* LyricsParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BB92E82694D00EFD18F /* LyricsParser.swift */; };
+		F85F5BD92E82694D00EFD18F /* LyricStruct.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BBB2E82694D00EFD18F /* LyricStruct.swift */; };
+		F85F5BDA2E82694D00EFD18F /* SongObject.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BBC2E82694D00EFD18F /* SongObject.swift */; };
+		F85F5BDB2E82694D00EFD18F /* ViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BBD2E82694D00EFD18F /* ViewModel.swift */; };
+		F85F5BDC2E82694D00EFD18F /* AnimatedMeshGradientView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BC12E82694D00EFD18F /* AnimatedMeshGradientView.swift */; };
+		F85F5BDD2E82694D00EFD18F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BC22E82694D00EFD18F /* AppDelegate.swift */; };
+		F85F5BDE2E82694D00EFD18F /* AppleMusicScripting.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BC32E82694D00EFD18F /* AppleMusicScripting.swift */; };
+		F85F5BDF2E82694D00EFD18F /* AudioFormatManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BC52E82694D00EFD18F /* AudioFormatManager.swift */; };
+		F85F5BE02E82694D00EFD18F /* AudioSyncApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BC72E82694D00EFD18F /* AudioSyncApp.swift */; };
+		F85F5BE12E82694D00EFD18F /* FullScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BC82E82694D00EFD18F /* FullScreenView.swift */; };
+		F85F5BE22E82694D00EFD18F /* KaraokeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BCA2E82694D00EFD18F /* KaraokeView.swift */; };
+		F85F5BE32E82694D00EFD18F /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BCB2E82694D00EFD18F /* Log.swift */; };
+		F85F5BE42E82694D00EFD18F /* Lyrics.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BCC2E82694D00EFD18F /* Lyrics.xcdatamodeld */; };
+		F85F5BE52E82694D00EFD18F /* LyricsSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BCD2E82694D00EFD18F /* LyricsSelectorView.swift */; };
+		F85F5BE62E82694D00EFD18F /* NetworkUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BCE2E82694D00EFD18F /* NetworkUtil.swift */; };
+		F85F5BE72E82694D00EFD18F /* PlaybackNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BCF2E82694D00EFD18F /* PlaybackNotifier.swift */; };
+		F85F5BE82E82694D00EFD18F /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BD02E82694D00EFD18F /* Utils.swift */; };
 		F86657082DDC252100E55B82 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = F86657072DDC251800E55B82 /* README.md */; };
-		F8A42E1D2E7D278500E3797B /* CocoaLumberjack in Frameworks */ = {isa = PBXBuildFile; productRef = F8A42E1C2E7D278500E3797B /* CocoaLumberjack */; };
-		F8A42E1F2E7D278500E3797B /* CocoaLumberjackSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F8A42E1E2E7D278500E3797B /* CocoaLumberjackSwift */; };
 		F8F61C9D2DC0999C007B028F /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8F61C9C2DC0999C007B028F /* AppKit.framework */; };
 		F8F61C9F2DC099A4007B028F /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8F61C9E2DC099A4007B028F /* CoreAudio.framework */; };
 		F8F61CA12DC099AB007B028F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8F61CA02DC099AB007B028F /* Foundation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		F85F5BB72E82694D00EFD18F /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
+		F85F5BB82E82694D00EFD18F /* LyricsHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsHeader.swift; sourceTree = "<group>"; };
+		F85F5BB92E82694D00EFD18F /* LyricsParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsParser.swift; sourceTree = "<group>"; };
+		F85F5BBB2E82694D00EFD18F /* LyricStruct.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricStruct.swift; sourceTree = "<group>"; };
+		F85F5BBC2E82694D00EFD18F /* SongObject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongObject.swift; sourceTree = "<group>"; };
+		F85F5BBD2E82694D00EFD18F /* ViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModel.swift; sourceTree = "<group>"; };
+		F85F5BBF2E82694D00EFD18F /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		F85F5BC12E82694D00EFD18F /* AnimatedMeshGradientView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedMeshGradientView.swift; sourceTree = "<group>"; };
+		F85F5BC22E82694D00EFD18F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		F85F5BC32E82694D00EFD18F /* AppleMusicScripting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleMusicScripting.swift; sourceTree = "<group>"; };
+		F85F5BC42E82694D00EFD18F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F85F5BC52E82694D00EFD18F /* AudioFormatManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFormatManager.swift; sourceTree = "<group>"; };
+		F85F5BC62E82694D00EFD18F /* AudioSync.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AudioSync.entitlements; sourceTree = "<group>"; };
+		F85F5BC72E82694D00EFD18F /* AudioSyncApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSyncApp.swift; sourceTree = "<group>"; };
+		F85F5BC82E82694D00EFD18F /* FullScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullScreenView.swift; sourceTree = "<group>"; };
+		F85F5BC92E82694D00EFD18F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F85F5BCA2E82694D00EFD18F /* KaraokeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KaraokeView.swift; sourceTree = "<group>"; };
+		F85F5BCB2E82694D00EFD18F /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
+		F85F5BCD2E82694D00EFD18F /* LyricsSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsSelectorView.swift; sourceTree = "<group>"; };
+		F85F5BCE2E82694D00EFD18F /* NetworkUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkUtil.swift; sourceTree = "<group>"; };
+		F85F5BCF2E82694D00EFD18F /* PlaybackNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackNotifier.swift; sourceTree = "<group>"; };
+		F85F5BD02E82694D00EFD18F /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
+		F85F5BD22E82694D00EFD18F /* Lyrics.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = Lyrics.xcdatamodel; sourceTree = "<group>"; };
 		F86657072DDC251800E55B82 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		F8F61C892DC097BD007B028F /* AudioSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AudioSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8F61C9C2DC0999C007B028F /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		F8F61C9E2DC099A4007B028F /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		F8F61CA02DC099AB007B028F /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		F825553C2DD1EA1F00270D0E /* Exceptions for "AudioSync" folder in "AudioSync" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = F8F61C882DC097BD007B028F /* AudioSync */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		F8F61C8B2DC097BD007B028F /* AudioSync */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				F825553C2DD1EA1F00270D0E /* Exceptions for "AudioSync" folder in "AudioSync" target */,
-			);
-			path = AudioSync;
-			sourceTree = "<group>";
-		};
-/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		F8F61C862DC097BD007B028F /* Frameworks */ = {
@@ -52,9 +73,7 @@
 			files = (
 				F808FE022DD8B57F0041F8CA /* Regex in Frameworks */,
 				F8F61C9F2DC099A4007B028F /* CoreAudio.framework in Frameworks */,
-				F8A42E1F2E7D278500E3797B /* CocoaLumberjackSwift in Frameworks */,
 				F8F61CA12DC099AB007B028F /* Foundation.framework in Frameworks */,
-				F8A42E1D2E7D278500E3797B /* CocoaLumberjack in Frameworks */,
 				F8F61C9D2DC0999C007B028F /* AppKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -62,10 +81,88 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		F85F5BBA2E82694D00EFD18F /* LyricsParser */ = {
+			isa = PBXGroup;
+			children = (
+				F85F5BB72E82694D00EFD18F /* Extensions.swift */,
+				F85F5BB82E82694D00EFD18F /* LyricsHeader.swift */,
+				F85F5BB92E82694D00EFD18F /* LyricsParser.swift */,
+			);
+			path = LyricsParser;
+			sourceTree = "<group>";
+		};
+		F85F5BBE2E82694D00EFD18F /* model */ = {
+			isa = PBXGroup;
+			children = (
+				F85F5BBB2E82694D00EFD18F /* LyricStruct.swift */,
+				F85F5BBC2E82694D00EFD18F /* SongObject.swift */,
+				F85F5BBD2E82694D00EFD18F /* ViewModel.swift */,
+			);
+			path = model;
+			sourceTree = "<group>";
+		};
+		F85F5BC02E82694D00EFD18F /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				F85F5BBF2E82694D00EFD18F /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		F85F5BD12E82694D00EFD18F /* AudioSync */ = {
+			isa = PBXGroup;
+			children = (
+				F85F5BBA2E82694D00EFD18F /* LyricsParser */,
+				F85F5BBE2E82694D00EFD18F /* model */,
+				F85F5BC02E82694D00EFD18F /* Preview Content */,
+				F85F5BEB2E8269D300EFD18F /* service */,
+				F85F5BC42E82694D00EFD18F /* Assets.xcassets */,
+				F85F5BC62E82694D00EFD18F /* AudioSync.entitlements */,
+				F85F5BC72E82694D00EFD18F /* AudioSyncApp.swift */,
+				F85F5BEA2E82699D00EFD18F /* view */,
+				F85F5BC92E82694D00EFD18F /* Info.plist */,
+				F85F5BCC2E82694D00EFD18F /* Lyrics.xcdatamodeld */,
+				F85F5BE92E82696A00EFD18F /* utils */,
+			);
+			path = AudioSync;
+			sourceTree = "<group>";
+		};
+		F85F5BE92E82696A00EFD18F /* utils */ = {
+			isa = PBXGroup;
+			children = (
+				F85F5BCB2E82694D00EFD18F /* Log.swift */,
+				F85F5BCE2E82694D00EFD18F /* NetworkUtil.swift */,
+				F85F5BD02E82694D00EFD18F /* Utils.swift */,
+			);
+			path = utils;
+			sourceTree = "<group>";
+		};
+		F85F5BEA2E82699D00EFD18F /* view */ = {
+			isa = PBXGroup;
+			children = (
+				F85F5BC82E82694D00EFD18F /* FullScreenView.swift */,
+				F85F5BCA2E82694D00EFD18F /* KaraokeView.swift */,
+				F85F5BCD2E82694D00EFD18F /* LyricsSelectorView.swift */,
+				F85F5BC12E82694D00EFD18F /* AnimatedMeshGradientView.swift */,
+			);
+			path = view;
+			sourceTree = "<group>";
+		};
+		F85F5BEB2E8269D300EFD18F /* service */ = {
+			isa = PBXGroup;
+			children = (
+				F85F5BC22E82694D00EFD18F /* AppDelegate.swift */,
+				F85F5BC32E82694D00EFD18F /* AppleMusicScripting.swift */,
+				F85F5BC52E82694D00EFD18F /* AudioFormatManager.swift */,
+				F85F5BCF2E82694D00EFD18F /* PlaybackNotifier.swift */,
+			);
+			path = service;
+			sourceTree = "<group>";
+		};
 		F8F61C802DC097BD007B028F = {
 			isa = PBXGroup;
 			children = (
-				F8F61C8B2DC097BD007B028F /* AudioSync */,
+				F85F5BD12E82694D00EFD18F /* AudioSync */,
 				F8F61C9B2DC0999C007B028F /* Frameworks */,
 				F8F61C8A2DC097BD007B028F /* Products */,
 				F86657072DDC251800E55B82 /* README.md */,
@@ -105,14 +202,9 @@
 			);
 			dependencies = (
 			);
-			fileSystemSynchronizedGroups = (
-				F8F61C8B2DC097BD007B028F /* AudioSync */,
-			);
 			name = AudioSync;
 			packageProductDependencies = (
 				F808FE012DD8B57F0041F8CA /* Regex */,
-				F8A42E1C2E7D278500E3797B /* CocoaLumberjack */,
-				F8A42E1E2E7D278500E3797B /* CocoaLumberjackSwift */,
 			);
 			productName = AudioSync;
 			productReference = F8F61C892DC097BD007B028F /* AudioSync.app */;
@@ -144,7 +236,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				F808FE002DD8B57F0041F8CA /* XCRemoteSwiftPackageReference "Regex" */,
-				F8A42E1B2E7D278500E3797B /* XCRemoteSwiftPackageReference "CocoaLumberjack" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F8F61C8A2DC097BD007B028F /* Products */;
@@ -161,6 +252,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F85F5BD32E82694D00EFD18F /* Preview Assets.xcassets in Resources */,
+				F85F5BD42E82694D00EFD18F /* Assets.xcassets in Resources */,
 				F86657082DDC252100E55B82 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -172,6 +265,25 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F85F5BD62E82694D00EFD18F /* Extensions.swift in Sources */,
+				F85F5BD72E82694D00EFD18F /* LyricsHeader.swift in Sources */,
+				F85F5BD82E82694D00EFD18F /* LyricsParser.swift in Sources */,
+				F85F5BD92E82694D00EFD18F /* LyricStruct.swift in Sources */,
+				F85F5BDA2E82694D00EFD18F /* SongObject.swift in Sources */,
+				F85F5BDB2E82694D00EFD18F /* ViewModel.swift in Sources */,
+				F85F5BDC2E82694D00EFD18F /* AnimatedMeshGradientView.swift in Sources */,
+				F85F5BDD2E82694D00EFD18F /* AppDelegate.swift in Sources */,
+				F85F5BDE2E82694D00EFD18F /* AppleMusicScripting.swift in Sources */,
+				F85F5BDF2E82694D00EFD18F /* AudioFormatManager.swift in Sources */,
+				F85F5BE02E82694D00EFD18F /* AudioSyncApp.swift in Sources */,
+				F85F5BE12E82694D00EFD18F /* FullScreenView.swift in Sources */,
+				F85F5BE22E82694D00EFD18F /* KaraokeView.swift in Sources */,
+				F85F5BE32E82694D00EFD18F /* Log.swift in Sources */,
+				F85F5BE42E82694D00EFD18F /* Lyrics.xcdatamodeld in Sources */,
+				F85F5BE52E82694D00EFD18F /* LyricsSelectorView.swift in Sources */,
+				F85F5BE62E82694D00EFD18F /* NetworkUtil.swift in Sources */,
+				F85F5BE72E82694D00EFD18F /* PlaybackNotifier.swift in Sources */,
+				F85F5BE82E82694D00EFD18F /* Utils.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -394,14 +506,6 @@
 				kind = branch;
 			};
 		};
-		F8A42E1B2E7D278500E3797B /* XCRemoteSwiftPackageReference "CocoaLumberjack" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/CocoaLumberjack/CocoaLumberjack";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 3.9.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -410,17 +514,20 @@
 			package = F808FE002DD8B57F0041F8CA /* XCRemoteSwiftPackageReference "Regex" */;
 			productName = Regex;
 		};
-		F8A42E1C2E7D278500E3797B /* CocoaLumberjack */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = F8A42E1B2E7D278500E3797B /* XCRemoteSwiftPackageReference "CocoaLumberjack" */;
-			productName = CocoaLumberjack;
-		};
-		F8A42E1E2E7D278500E3797B /* CocoaLumberjackSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = F8A42E1B2E7D278500E3797B /* XCRemoteSwiftPackageReference "CocoaLumberjack" */;
-			productName = CocoaLumberjackSwift;
-		};
 /* End XCSwiftPackageProductDependency section */
+
+/* Begin XCVersionGroup section */
+		F85F5BCC2E82694D00EFD18F /* Lyrics.xcdatamodeld */ = {
+			isa = XCVersionGroup;
+			children = (
+				F85F5BD22E82694D00EFD18F /* Lyrics.xcdatamodel */,
+			);
+			currentVersion = F85F5BD22E82694D00EFD18F /* Lyrics.xcdatamodel */;
+			path = Lyrics.xcdatamodeld;
+			sourceTree = "<group>";
+			versionGroupType = wrapper.xcdatamodel;
+		};
+/* End XCVersionGroup section */
 	};
 	rootObject = F8F61C812DC097BD007B028F /* Project object */;
 }
