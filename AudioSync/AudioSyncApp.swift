@@ -9,18 +9,41 @@ import AppKit
 import CoreAudio
 import Foundation
 import SwiftUI
-
+import SwiftData
 @main
 struct AudioSyncApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @ObservedObject var viewModel = ViewModel.shared
     @AppStorage("isKaraokeVisible") var isKaraokeVisible: Bool = false
+    @AppStorage("isShowLoginView") var isShowLoginView: Bool = false
     @State var isFullScreenVisible: Bool = false
     @State var karaoKeWindow: NSWindow? = nil
     @State var selectorWindow: NSWindow? = nil
     @Environment(\.openWindow) var openWindow
     @ObservedObject var audioManager = AudioFormatManager.shared
-
+    init(){
+        appDelegate.modelContainer = sharedModelContainer
+    }
+    var sharedModelContainer: ModelContainer = {
+        let schema = Schema([
+            Song.self
+            
+        ])
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false
+        )
+        do {
+            return try ModelContainer(
+                for: schema,
+                configurations: [modelConfiguration]
+            )
+        } catch {
+            fatalError("Could not create ModelContainer: \(error)")
+        }
+    }()
+    
+    
     private func CreateKaraoke() {
         if isKaraokeVisible && !isFullScreenVisible && viewModel.isCurrentTrackPlaying{
             if karaoKeWindow == nil {
@@ -108,6 +131,12 @@ struct AudioSyncApp: App {
                 Divider()
                 Toggle("全屏歌词", isOn: $isFullScreenVisible)
                     .keyboardShortcut("f")
+                
+                Divider()
+                Button("相似歌手"){
+                    openWindow(id: "similarArtistWindow")
+                }
+                
                 Divider()
                 Button("删除本地缓存", action: appDelegate.delCurrentSongObject)
                     .keyboardShortcut("d")
@@ -157,8 +186,14 @@ struct AudioSyncApp: App {
         .onChange(of: viewModel.isCurrentTrackPlaying, {
             CreateKaraoke()
         })
-        
-        
+        WindowGroup("similarArtist", id: "similarArtistWindow"){
+            SimilarArtistView()
+                .environmentObject(viewModel)
+                .onWindowDidAppear { window in
+                    window.setContentSize(NSSize(width: 250, height: 400))
+                    window.styleMask.remove(.fullScreen)  // 防止全屏
+                }
+        }
         WindowGroup("fullScreenLyrics", id: "fullScreen") {
             FullScreenView(isPresented: $isFullScreenVisible).environmentObject(viewModel)
                 .onWindowDidAppear { window in

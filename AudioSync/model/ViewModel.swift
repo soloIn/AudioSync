@@ -220,7 +220,7 @@ extension NSImage {
     }
     
 }
-struct CandidateSong {
+struct CandidateSong: Sendable {
     let id: String
     let name: String
     let artist: String

@@ -9,7 +9,7 @@
 import Foundation
 import Regex
 
-public enum LyricsFormat {
+public enum LyricsFormat: Sendable {
     case netEase  // 原始 LRC 格式
     case qq  // QQ 歌词格式
 }

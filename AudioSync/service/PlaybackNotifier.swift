@@ -71,7 +71,6 @@ class PlaybackNotifier {
         }
 
         Log.backend.info("appleNotification userInfo: \(userInfo)")
-        let albumKey = userInfo.uniqueKey(using: ["Album", "Artist"])
         let album = userInfo["Album"] as? String
         
         Task { @MainActor in
@@ -87,17 +86,16 @@ class PlaybackNotifier {
                 }
                 Log.backend.info("play...")
                 script?.setPlayerPosition?(0.0)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {[weak self] in
                     script?.playpause?()
+                    Task {
+                        // 恢复歌词：切歌会导致歌词时间计算停止
+                            if let self = self {
+                                self.scriptNotification()
+                            }
+                        }
                 }
                 
-//                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-//                    [weak self] in
-//                    self?.audioManager.isSameSong.removeValue(
-//                        forKey: songKey
-//                    )
-//
-//                }
             }
         }
     }

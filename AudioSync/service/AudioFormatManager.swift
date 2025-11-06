@@ -2,7 +2,7 @@ import Combine
 import CoreAudio
 
 class AudioFormatManager: ObservableObject {
-    static let shared: AudioFormatManager = AudioFormatManager()
+    @MainActor static let shared: AudioFormatManager = AudioFormatManager()
     @Published var sampleRate: Int?
     @Published var bitDepth: Int?
     @Published var isSameAlbum: [String: Bool] = [:]
@@ -125,17 +125,17 @@ class AudioFormatManager: ObservableObject {
             let data = handle.availableData
             guard !data.isEmpty else { return }
             
-            self?.processingQueue.async {
-                if let output = String(data: data, encoding: .utf8) {
-                    self?.parseLog(output)
+            if let output = String(data: data, encoding: .utf8) {
+                    Task { @MainActor in
+                        AudioFormatManager.shared.parseLog(output)
+                    }
                 }
-            }
         }
 
         logProcess?.terminationHandler = { [weak self] process in
                     DispatchQueue.main.async {
-                        if self?.isMonitoring == true { // 仅在仍在监控状态时重置
-                            self?.isMonitoring = false
+                        if AudioFormatManager.shared.isMonitoring == true { // 仅在仍在监控状态时重置
+                            AudioFormatManager.shared.isMonitoring = false
                         }
                     }
                 }
@@ -145,7 +145,7 @@ class AudioFormatManager: ObservableObject {
         } catch {
             Log.backend.error("AudioFormatManager: setupLogProcess   error: \(error)")
             DispatchQueue.main.async {
-                self.isMonitoring = false  // 启动失败，重置状态
+                AudioFormatManager.shared.isMonitoring = false  // 启动失败，重置状态
             }
         }
     }
@@ -178,7 +178,7 @@ class AudioFormatManager: ObservableObject {
                 self.lastLogTime = now
 
                 DispatchQueue.main.async {
-                    self.currentFormat = (sr, bd)
+                    AudioFormatManager.shared.currentFormat = (sr, bd)
                 }
             }
         }
@@ -213,7 +213,7 @@ class AudioFormatManager: ObservableObject {
                 logProcess = nil
                 logPipe = nil
 
-                DispatchQueue.main.async { self.isMonitoring = false }
+        DispatchQueue.main.async { AudioFormatManager.shared.isMonitoring = false }
     }
 
     deinit {

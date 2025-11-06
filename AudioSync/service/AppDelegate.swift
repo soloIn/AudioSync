@@ -11,6 +11,7 @@ import Combine
 import CoreAudio
 import Foundation
 import MusicKit
+import SwiftData
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -20,24 +21,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var networkUtil: NetworkUtil?
     @ObservedObject var viewModel: ViewModel = ViewModel.shared
     private var cancellables = Set<AnyCancellable>()
-    let coreDataContainer: NSPersistentContainer
+    var modelContainer: ModelContainer?
 
-    override init() {
-        // 使用你的 .xcdatamodeld 文件名（不带扩展）
-        self.coreDataContainer = NSPersistentContainer(name: "Lyrics")
-        super.init()
-        coreDataContainer.loadPersistentStores { description, error in
-            if let error = error {
-                fatalError("❌ CoreData 加载失败: \(error)")
-            } else {
-                Log.backend.info("✅ CoreData 加载成功: \(description)")
-            }
-        }
-        coreDataContainer.viewContext.automaticallyMergesChangesFromParent =
-            true
-        coreDataContainer.viewContext.mergePolicy =
-            NSMergeByPropertyObjectTrumpMergePolicy
-    }
+    //    override init() {
+    //        // 使用你的 .xcdatamodeld 文件名（不带扩展）
+    //        self.coreDataContainer = NSPersistentContainer(name: "Lyrics")
+    //        super.init()
+    //        coreDataContainer.loadPersistentStores { description, error in
+    //            if let error = error {
+    //                fatalError("❌ CoreData 加载失败: \(error)")
+    //            } else {
+    //                Log.backend.info("✅ CoreData 加载成功: \(description)")
+    //            }
+    //        }
+    //        coreDataContainer.viewContext.automaticallyMergesChangesFromParent =
+    //            true
+    //        coreDataContainer.viewContext.mergePolicy =
+    //            NSMergeByPropertyObjectTrumpMergePolicy
+    //    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
 
@@ -96,57 +97,60 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if trigger == .script {
                 Task { [weak self] in
                     guard let self else { return }
-                    guard viewModel.isViewLyricsShow else { return }
-                    guard let scriptTrackInfo = trackInfo else {return}
+                    let lastTrackID = self.viewModel.currentTrack?.trackID
+                    self.viewModel.currentTrack = trackInfo
+                    guard viewModel.isViewLyricsShow,
+                        let scriptTrackInfo = trackInfo
+                    else { return }
 
-                                    if scriptTrackInfo.state == .playing {
-                                        viewModel.isCurrentTrackPlaying = true
-                                    } else {
-                                        viewModel.isCurrentTrackPlaying = false
-                                        viewModel.stopLyricUpdater()
-                                        return
-                                    }
+                    if scriptTrackInfo.state == .playing {
+                        viewModel.isCurrentTrackPlaying = true
+                    } else {
+                        viewModel.isCurrentTrackPlaying = false
+                        viewModel.stopLyricUpdater()
+                        return
+                    }
 
                     // 若为同一首歌且已有歌词，不处理
-                    if viewModel.currentTrack?.trackID == scriptTrackInfo.trackID,
+                    if lastTrackID == scriptTrackInfo.trackID,
                         !viewModel.currentlyPlayingLyrics.isEmpty
                     {
                         viewModel.startLyricUpdater()
                         return
                     }
 
-                    viewModel.currentTrack = trackInfo
                     viewModel.currentlyPlayingLyrics = []
                     viewModel.currentlyPlayingLyricsIndex = nil
                     viewModel.stopLyricUpdater()
 
-                    
-                    let context = coreDataContainer.viewContext
-                    context.refreshAllObjects()
                     viewModel.isCurrentTrackPlaying = true
                     viewModel.startLyricUpdater()
-                    if loadLyricsFromLocal(trackInfo: scriptTrackInfo, context: context) {
+                    if loadLyricsFromLocal(trackInfo: scriptTrackInfo) {
                         return
                     }
 
                     await loadLyricsFromNetwork(
-                        trackInfo: scriptTrackInfo,
-                        context: context
+                        trackInfo: scriptTrackInfo
                     )
 
                 }
             }
         }
+        playbackNotifier?.scriptNotification()
     }
     private func loadLyricsFromLocal(
-        trackInfo: TrackInfo,
-        context: NSManagedObjectContext
+        trackInfo: TrackInfo
     ) -> Bool {
-        if let songObject = SongObject.fetchSong(
-            byID: trackInfo.trackID,
-            context: context
-        ) {
-            let localLyrics = songObject.getLyrics()
+        guard let modelContext = modelContainer?.mainContext else {
+            return false
+        }
+        let trackID = trackInfo.trackID
+        let descriptor = FetchDescriptor<Song>(
+            predicate: #Predicate { $0.id == trackID }
+        )
+
+        if let song = try? modelContext.fetch(descriptor).first {
+            let localLyrics = song.getLyrics()
             if !localLyrics.isEmpty {
                 Log.general.info("本地歌词")
                 viewModel.currentlyPlayingLyrics = localLyrics
@@ -159,8 +163,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func loadLyricsFromNetwork(
-        trackInfo: TrackInfo,
-        context: NSManagedObjectContext
+        trackInfo: TrackInfo
     ) async {
         do {
             let trackName = trackInfo.name
@@ -185,12 +188,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 viewModel.currentAlbumColor = trackInfo.color ?? []
                 viewModel.startLyricUpdater()
 
-                SongObject.saveSong(
+                // song 保存
+                guard let modelContext = modelContainer?.mainContext else {
+                    return
+                }
+                let song = Song(
                     id: trackInfo.trackID,
                     trackName: trackName,
-                    lyrics: finishLyrics,
-                    in: context
+                    lyrics: finishLyrics
                 )
+                modelContext.insert(song)
+                try? modelContext.save()
             }
 
         } catch {
@@ -212,8 +220,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         else {
             return
         }
-        let context = coreDataContainer.viewContext
-        SongObject.deleteSong(byID: trackID, context: context)
+        // 删除song
+        let modelContext = modelContainer?.mainContext
+        let descriptor = FetchDescriptor<Song>(
+            predicate: #Predicate { $0.id == trackID }
+        )
+        if let song = try? modelContext?.fetch(descriptor).first {
+            modelContext?.delete(song)
+            try? modelContext?.save()
+        }
         viewModel.currentTrack = nil
         playbackNotifier?.scriptNotification()
     }
@@ -224,6 +239,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc func similarSingers() {
+        Task {
+            do {
+                Log.general.info("start fetch similar artists")
+                let artist = try await networkUtil?.fetchSimilarArtists(
+                    name: "周杰倫"
+                )
+
+                let artistID = try await IDFetcher.fetchArtistID(by: "周杰倫")
+                // 步骤 2: 使用 ID 跳转到艺术家主页 (使用 Universal Link，如 MusicNavigator 中所推荐)
+                let success = try MusicNavigator.openArtistPage(by: artistID)
+
+            }
+        }
+    }
     private func manulNameAsyncFetch() async {
         do {
             guard let manualName = NSPasteboard.general.string(forType: .string)
@@ -237,7 +267,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
 
-            let context = coreDataContainer.viewContext
             let netEaseLyrics = try await networkUtil?.fetchLyrics(
                 trackName: manualName,
                 artist: currentTrack.artist,
@@ -247,17 +276,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             )
 
             if !netEaseLyrics!.isEmpty {
+                guard let modelContext = modelContainer?.mainContext else {
+                    return
+                }
                 let finishLyrics = finishLyric(netEaseLyrics!)
-                SongObject.deleteSong(
-                    byID: currentTrack.trackID,
-                    context: context
+                let trackID = currentTrack.trackID
+                let descriptor = FetchDescriptor<Song>(
+                    predicate: #Predicate { $0.id == trackID }
                 )
-                SongObject.saveSong(
+                if let song = try? modelContext.fetch(descriptor).first {
+                    modelContext.delete(song)
+                }
+                let songNew = Song(
                     id: currentTrack.trackID,
-                    trackName: manualName,
-                    lyrics: finishLyrics,
-                    in: context
+                    trackName: currentTrack.name,
+                    lyrics: finishLyrics
                 )
+                modelContext.insert(songNew)
+
+                try? modelContext.save()
+
                 playbackNotifier?.scriptNotification()
             }
 

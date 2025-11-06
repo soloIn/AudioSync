@@ -7,16 +7,32 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "FE56CEA1-5217-41BA-88ED-E0246D72672B"
+            uuid = "AB091AB1-9924-4B30-B3E1-09116BAB7886"
             shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
-            filePath = "AudioSync/PlaybackNotifier.swift"
+            filePath = "AudioSync/utils/NetworkUtil.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "129"
-            endingLineNumber = "129"
-            landmarkName = "fetchCurrentTrack()"
+            startingLineNumber = "515"
+            endingLineNumber = "515"
+            landmarkName = "fetchSimilarArtists(name:)"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "EF40ABA0-947C-4CEC-9258-FC12834F4410"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "AudioSync/utils/NetworkUtil.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "521"
+            endingLineNumber = "521"
+            landmarkName = "fetchSimilarArtists(name:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

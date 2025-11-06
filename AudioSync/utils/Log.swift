@@ -17,7 +17,7 @@ struct AppLogger {
     let logger: Logger
     let category: String
     
-    static var globalLevel: LogLevel = .debug // 可动态修改
+    static let globalLevel: LogLevel = .debug // 可动态修改
     
     init(subsystem: String, category: String) {
         self.logger = Logger(subsystem: subsystem, category: category)
