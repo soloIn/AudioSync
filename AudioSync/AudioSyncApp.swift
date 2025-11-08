@@ -19,6 +19,7 @@ struct AudioSyncApp: App {
     @State var isFullScreenVisible: Bool = false
     @State var karaoKeWindow: NSWindow? = nil
     @State var selectorWindow: NSWindow? = nil
+    @State var similarArtistWindow: NSWindow? = nil
     @Environment(\.openWindow) var openWindow
     @ObservedObject var audioManager = AudioFormatManager.shared
     init(){
@@ -80,6 +81,35 @@ struct AudioSyncApp: App {
             karaoKeWindow?.orderOut(nil)
         }
     }
+
+    private func showSimilarArtistWindow() {
+        if similarArtistWindow == nil {
+            let contentView = NSHostingView(
+                rootView: SimilarArtistView()
+                    .environmentObject(viewModel)
+            )
+
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 250, height: 400),
+                styleMask: [.titled,.closable],
+                backing: .buffered,
+                defer: false
+            )
+           // window.title = "相似歌手"
+            window.center()
+            window.contentView = contentView
+            window.level = .floating         // 🔹关键：浮动在其他应用前
+            window.isMovableByWindowBackground = true
+            window.isReleasedWhenClosed = false
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true) // 保证出现在最前
+
+            similarArtistWindow = window
+        } else {
+            similarArtistWindow?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
     private func createLyricsManualView(needNanualSelection: Bool) {
         if needNanualSelection {
             if selectorWindow == nil {
@@ -134,7 +164,7 @@ struct AudioSyncApp: App {
                 
                 Divider()
                 Button("相似歌手"){
-                    openWindow(id: "similarArtistWindow")
+                    showSimilarArtistWindow()
                 }
                 
                 Divider()
@@ -186,14 +216,6 @@ struct AudioSyncApp: App {
         .onChange(of: viewModel.isCurrentTrackPlaying, {
             CreateKaraoke()
         })
-        WindowGroup("similarArtist", id: "similarArtistWindow"){
-            SimilarArtistView()
-                .environmentObject(viewModel)
-                .onWindowDidAppear { window in
-                    window.setContentSize(NSSize(width: 250, height: 400))
-                    window.styleMask.remove(.fullScreen)  // 防止全屏
-                }
-        }
         WindowGroup("fullScreenLyrics", id: "fullScreen") {
             FullScreenView(isPresented: $isFullScreenVisible).environmentObject(viewModel)
                 .onWindowDidAppear { window in

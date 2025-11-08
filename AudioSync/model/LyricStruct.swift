@@ -63,6 +63,18 @@ struct NetEaseSearch: Decodable {
         }
     }
 }
+struct NetEaseArtist: Decodable{
+    let result: NetEaseArtist.Result
+    
+    struct Result: Decodable {
+        let artists: [NetEaseArtist.Artist]
+    }
+    struct Artist: Decodable {
+        let name: String
+        let picUrl: String
+        let id: Int
+    }
+}
 
 struct NetEaseLyrics: Decodable {
     let lrc: Lyric?

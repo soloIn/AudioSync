@@ -2,7 +2,7 @@
 import SwiftData
 import Foundation
 @Model
-class Artist {
+final class Artist: Identifiable, Sendable {
     @Attribute(.unique) var id: String
     var mbid: String
     var name: String

@@ -125,6 +125,54 @@ public class NetworkUtil {
         case parsingError(String)
     }
     
+    func fetchNetEaseArtist(name: String) async throws -> Artist?{
+        let request = URLRequest(url: URL(string: "https://neteasecloudmusicapi-ten-wine.vercel.app/cloudsearch?keywords=\(name)&limit=1&type=100")!)
+        
+        let response = try await fakeSpotifyUserAgentSession.data(for: request)
+        let decoder = JSONDecoder()
+        let netEaseArtists = try decoder.decode(NetEaseArtist.self, from: response.0)
+        guard let netEaseArtist = netEaseArtists.result.artists.first else {
+            return nil
+        }
+        let artist = Artist(name: netEaseArtist.name, url: netEaseArtist.picUrl)
+        Log.backend.info("找到歌手 \(name) 封面：\(artist.url)")
+        return artist
+    }
+    func fetchSimilarArtistsAndCovers() {
+        Task {
+            do {
+                // 1. 获取相似歌手
+                let fetched = try await fetchSimilarArtists(
+                    name: viewModel.currentTrack?.artist ?? ""
+                )
+                await MainActor.run {
+                    viewModel.similarArtists = fetched
+                }
+                // 2. 查封面
+                await withTaskGroup(of: (Int, String?).self) { group in
+                    for i in await viewModel.similarArtists.indices {
+                        if Task.isCancelled { break }
+                        let name = await viewModel.similarArtists[i].name
+                        group.addTask {
+                            let cover = try? await self.fetchNetEaseArtist(name: name)
+                            return (i, cover?.url)
+                        }
+                    }
+
+                    for await (i, url) in group {
+                        if Task.isCancelled { break }
+                        if let url {
+                            await MainActor.run {
+                                viewModel.similarArtists[i].url = url
+                            }
+                        }
+                    }
+                }
+            } catch {
+                Log.ui.error("Failed to fetch similar artists: \(error)")
+            }
+        }
+    }
     func fetchNetEaseLyrics(
         trackName: String, artist: String, trackID: String, album: String
     ) async -> [LyricLine] {
@@ -512,12 +560,9 @@ public class NetworkUtil {
         return ""
     }
     func fetchSimilarArtists(name: String) async throws -> [Artist] {
-        let request = URLRequest(url: URL(string: "http://ws.audioscrobbler.com/2.0/?method=artist.getsimilar&artist=\(name)&api_key=7c53dde26c531f5d311fd23734b54150&limit=10&format=json")!)
+        let request = URLRequest(url: URL(string: "http://ws.audioscrobbler.com/2.0/?method=artist.getsimilar&artist=\(name)&api_key=key&limit=10&format=json")!)
         let response = try await fakeSpotifyUserAgentSession.data(for: request)
         let decoder = JSONDecoder()
-        if let str = String(data: response.0, encoding: .utf8) {
-            Log.general.info("原始响应：\(str)")
-        }
         let artistResponse = try decoder.decode(ArtistResponse.self, from: response.0)
         Log.general.info("response: \(JSON.stringify(artistResponse))")
         guard let similars = artistResponse.similarartists?.artist else {return []}

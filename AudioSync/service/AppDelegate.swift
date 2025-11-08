@@ -47,16 +47,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         playbackNotifier = PlaybackNotifier()
         Task { @MainActor in
             self.networkUtil = NetworkUtil(viewModel: self.viewModel)
-            self.viewModel.$isViewLyricsShow
+            
+            viewModel.$isViewLyricsShow
                 .removeDuplicates()
-                .sink { [weak self] isShowLyrics in
+            .sink { [weak self] isShowLyrics in
+                guard let self = self else { return }
+                Log.general.info("显示歌词 -> \(isShowLyrics)")
+                if isShowLyrics {
+                    playbackNotifier?.scriptNotification()
+                } else {
+                    viewModel.stopLyricUpdater()
+                }
+            }
+            .store(in: &cancellables)
+            
+            viewModel.$currentTrack
+                .removeDuplicates()
+                .sink { [weak self] currentTrack in
                     guard let self = self else { return }
-                    Log.general.info("显示歌词 -> \(isShowLyrics)")
-                    if isShowLyrics {
-                        playbackNotifier?.scriptNotification()
-                    } else {
-                        viewModel.stopLyricUpdater()
-                    }
+                    networkUtil?.fetchSimilarArtistsAndCovers()
                 }
                 .store(in: &cancellables)
 
@@ -66,28 +75,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 添加播放通知回调逻辑
-        playbackNotifier?.onPlay = { [weak self] trackInfo, trigger in
+        playbackNotifier?.onPlay = {
+            [weak self, weak playbackNotifier] trackInfo, trigger in
+            guard let self = self, let notifier = playbackNotifier else {
+                return
+            }
             // 采样率和位深同步
             if trigger == .notification {
                 await withCheckedContinuation { continuation in
                     var didResume = false
                     Task {
-                        self?.audioManager.onFormatUpdate = {
-                            [weak self] sampleRate, bitDepth in
-                            self?.audioManager.updateOutputFormat()
-                            self?.playbackNotifier?.scriptNotification()
+                        self.audioManager.onFormatUpdate = {
+                            sampleRate,
+                            bitDepth in
+                            self.audioManager.updateOutputFormat()
+                            notifier.scriptNotification()
                             if !didResume {
                                 didResume = true
                                 continuation.resume()
                             }
                         }
-                        self?.audioManager.startMonitoring()
+                        self.audioManager.startMonitoring()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
                             if !didResume {
                                 didResume = true
                                 continuation.resume()
                             }
-                            self?.audioManager.stopMonitoring()
+                            self.audioManager.stopMonitoring()
                         }
 
                     }

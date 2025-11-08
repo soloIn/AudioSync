@@ -27,6 +27,7 @@ class ViewModel: ObservableObject {
     @Published var currentTrack: TrackInfo?
     @Published var scrollProxy: ScrollViewProxy?
     @Published var isCurrentTrackPlaying: Bool = false
+    @Published var similarArtists: [Artist] = []
     var onCandidateSelected: ((CandidateSong) -> Void)?  // ❗️等待用的回调
 
     var appleMusicScript: MusicApplication? = SBApplication(

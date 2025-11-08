@@ -3,7 +3,7 @@ import CoreAudio
 import ScriptingBridge
 import SwiftUI
 
-struct TrackInfo: Encodable {
+struct TrackInfo: Encodable, Equatable {
     let name: String
     let artist: String
     let albumArtist: String
@@ -16,7 +16,9 @@ struct TrackInfo: Encodable {
     enum CodingKeys: String, CodingKey {
         case name, artist, albumArtist, trackID, album, state, genre
     }
-
+    static func == (lhs: TrackInfo, rhs: TrackInfo) -> Bool {
+            return lhs.trackID == rhs.trackID
+        }
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(name, forKey: .name)
@@ -78,22 +80,17 @@ class PlaybackNotifier {
             {
                 audioManager.lastAlbum = album
                 //audioManager.isSameAlbum.updateValue(true, forKey: albumKey)
-                let script = appleMusicScript
-                script?.pause?()
+                guard let script = self.appleMusicScript else { return }
+                script.pause?()
                 Log.backend.info("pause...")
                 if let onPlay = onPlay {
                     await onPlay(nil, .notification)  // 等待执行完
                 }
                 Log.backend.info("play...")
-                script?.setPlayerPosition?(0.0)
+                script.setPlayerPosition?(0.0)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {[weak self] in
-                    script?.playpause?()
-                    Task {
-                        // 恢复歌词：切歌会导致歌词时间计算停止
-                            if let self = self {
-                                self.scriptNotification()
-                            }
-                        }
+                    script.playpause?()
+                    self?.scriptNotification()
                 }
                 
             }
