@@ -5,8 +5,6 @@ class AudioFormatManager: ObservableObject {
     @MainActor static let shared: AudioFormatManager = AudioFormatManager()
     @Published var sampleRate: Int?
     @Published var bitDepth: Int?
-    @Published var isSameAlbum: [String: Bool] = [:]
-    @Published var lastAlbum: String?
 
     var needChange: Bool = true
     var currentFormat: (sampleRate: Int, bitDepth: Int) = (0, 0) {
@@ -15,12 +13,14 @@ class AudioFormatManager: ObservableObject {
             if oldValue.sampleRate != currentFormat.sampleRate
                 || oldValue.bitDepth != currentFormat.bitDepth
             {
-                Log.backend.info("currentFormat changed from (\(oldValue.sampleRate), \(oldValue.bitDepth)) to (\(self.currentFormat.sampleRate), \(self.currentFormat.bitDepth))")
+                Log.backend.info(
+                    "currentFormat changed from (\(oldValue.sampleRate), \(oldValue.bitDepth)) to (\(self.currentFormat.sampleRate), \(self.currentFormat.bitDepth))"
+                )
                 sampleRate = currentFormat.sampleRate
                 bitDepth = currentFormat.bitDepth
-                needChange  = true
+                needChange = true
             } else {
-                Log.backend.info("currentFormat no change")
+                Log.backend.debug("currentFormat no change")
                 needChange = false
             }
             self.stopMonitoring()
@@ -76,37 +76,41 @@ class AudioFormatManager: ObservableObject {
         return status == noErr && isRunning != 0
     }
     private func fetchRecentLogs() {
-            // 在后台队列中执行，避免阻塞主线程
-            processingQueue.async { [weak self] in
-                let showProcess = Process()
-                showProcess.executableURL = URL(fileURLWithPath: "/usr/bin/log")
-                showProcess.arguments = [
-                    "show",
-                    "--style", "syslog",
-                    "--last", "1s",
-                    "--predicate",
-                    "process == 'Music' AND message CONTAINS 'Input format' AND message CONTAINS 'source'",
-                    "--info",
-                ]
+        // 在后台队列中执行，避免阻塞主线程
+        processingQueue.async { [weak self] in
+            let showProcess = Process()
+            showProcess.executableURL = URL(fileURLWithPath: "/usr/bin/log")
+            showProcess.arguments = [
+                "show",
+                "--style", "syslog",
+                "--last", "1s",
+                "--predicate",
+                "process == 'Music' AND message CONTAINS 'Input format' AND message CONTAINS 'source'",
+                "--info",
+            ]
 
-                let pipe = Pipe()
-                showProcess.standardOutput = pipe
+            let pipe = Pipe()
+            showProcess.standardOutput = pipe
 
-                do {
-                    try showProcess.run()
-                    
-                    // 同步读取所有输出数据，直到进程结束
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    showProcess.waitUntilExit() // 确保进程已完全终止
+            do {
+                try showProcess.run()
 
-                    if let output = String(data: data, encoding: .utf8), !output.isEmpty {
-                        self?.parseLog(output)
-                    }
-                } catch {
-                    Log.backend.error("AudioFormatManager: fetchRecentLogs error: \(error)")
+                // 同步读取所有输出数据，直到进程结束
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                showProcess.waitUntilExit()  // 确保进程已完全终止
+
+                if let output = String(data: data, encoding: .utf8),
+                    !output.isEmpty
+                {
+                    self?.parseLog(output)
                 }
+            } catch {
+                Log.backend.error(
+                    "AudioFormatManager: fetchRecentLogs error: \(error)"
+                )
             }
         }
+    }
     private func setupLogProcess() {
         logProcess = Process()
         logProcess?.executableURL = URL(fileURLWithPath: "/usr/bin/log")
@@ -124,26 +128,28 @@ class AudioFormatManager: ObservableObject {
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             guard !data.isEmpty else { return }
-            
+
             if let output = String(data: data, encoding: .utf8) {
-                    Task { @MainActor in
-                        AudioFormatManager.shared.parseLog(output)
-                    }
+                Task { @MainActor in
+                    AudioFormatManager.shared.parseLog(output)
                 }
+            }
         }
 
         logProcess?.terminationHandler = { [weak self] process in
-                    DispatchQueue.main.async {
-                        if AudioFormatManager.shared.isMonitoring == true { // 仅在仍在监控状态时重置
-                            AudioFormatManager.shared.isMonitoring = false
-                        }
-                    }
+            DispatchQueue.main.async {
+                if AudioFormatManager.shared.isMonitoring == true {  // 仅在仍在监控状态时重置
+                    AudioFormatManager.shared.isMonitoring = false
                 }
+            }
+        }
 
         do {
             try logProcess?.run()
         } catch {
-            Log.backend.error("AudioFormatManager: setupLogProcess   error: \(error)")
+            Log.backend.error(
+                "AudioFormatManager: setupLogProcess   error: \(error)"
+            )
             DispatchQueue.main.async {
                 AudioFormatManager.shared.isMonitoring = false  // 启动失败，重置状态
             }
@@ -158,7 +164,7 @@ class AudioFormatManager: ObservableObject {
         }
 
         let nsLog = log as NSString
-        Log.backend.info("Music Format log: \(nsLog)")
+        Log.backend.debug("Music Format log: \(nsLog)")
         regex.enumerateMatches(
             in: log,
             range: NSRange(location: 0, length: nsLog.length)
@@ -171,8 +177,9 @@ class AudioFormatManager: ObservableObject {
             if let sr = Int(sampleRate), let bd = Int(bitDepth) {
                 // 基于解析结果去重
                 if self.currentFormat.sampleRate == sr,
-                   self.currentFormat.bitDepth == bd,
-                   now - self.lastLogTime < 1 {
+                    self.currentFormat.bitDepth == bd,
+                    now - self.lastLogTime < 1
+                {
                     return
                 }
                 self.lastLogTime = now
@@ -184,7 +191,7 @@ class AudioFormatManager: ObservableObject {
         }
     }
 
-    func updateOutputFormat()  {
+    func updateOutputFormat() {
         if !needChange {
             return
         }
@@ -202,18 +209,20 @@ class AudioFormatManager: ObservableObject {
         guard isMonitoring else { return }
         Log.backend.info("stop log monitoring")
         // 1. 清理流式监控的 handler
-                logPipe?.fileHandleForReading.readabilityHandler = nil
-                
-                // 2. 终止流式监控的进程
-                if logProcess?.isRunning == true {
-                     logProcess?.terminate()
-                }
-               
-                // 3. 释放资源引用
-                logProcess = nil
-                logPipe = nil
+        logPipe?.fileHandleForReading.readabilityHandler = nil
 
-        DispatchQueue.main.async { AudioFormatManager.shared.isMonitoring = false }
+        // 2. 终止流式监控的进程
+        if logProcess?.isRunning == true {
+            logProcess?.terminate()
+        }
+
+        // 3. 释放资源引用
+        logProcess = nil
+        logPipe = nil
+
+        DispatchQueue.main.async {
+            AudioFormatManager.shared.isMonitoring = false
+        }
     }
 
     deinit {
@@ -223,7 +232,7 @@ class AudioFormatManager: ObservableObject {
     }
 
     private func setNominalSampleRate(_ rate: Int, for device: AudioDeviceID) {
-        
+
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyNominalSampleRate,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -329,8 +338,11 @@ class AudioFormatManager: ObservableObject {
             )
 
             if status == noErr {
-                let deviceName = getDeviceName(device) as NSString? ?? "Unknown Device"
-                Log.backend.info("成功为「\(deviceName)」同步格式：\(format.mBitsPerChannel)bit/\(format.mSampleRate)Hz")
+                let deviceName =
+                    getDeviceName(device) as NSString? ?? "Unknown Device"
+                Log.backend.info(
+                    "成功为「\(deviceName)」同步格式：\(format.mBitsPerChannel)bit/\(format.mSampleRate)Hz"
+                )
             } else {
                 Log.backend.error("设置失败 - \(status)")
             }
@@ -428,10 +440,12 @@ class AudioFormatManager: ObservableObject {
         let simplifiedFormats = formats.map { format in
             [
                 "sampleRate": format.mFormat.mSampleRate,
-                "bitDepth": format.mFormat.mBitsPerChannel
+                "bitDepth": format.mFormat.mBitsPerChannel,
             ]
         }
-        Log.backend.info("从\(JSON.stringify(simplifiedFormats))中未找到匹配「\(depth)Bit \(rate)kHz」的输出格式")
+        Log.backend.info(
+            "从\(JSON.stringify(simplifiedFormats))中未找到匹配「\(depth)Bit \(rate)kHz」的输出格式"
+        )
         // 次选：匹配采样率，使用更高位深
         if let rateMatch = formats.filter({
             Int($0.mFormat.mSampleRate) == rate

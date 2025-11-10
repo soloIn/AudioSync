@@ -17,25 +17,29 @@ struct FullScreenView: View {
                                 .frame(
                                     minWidth: 0.50 * (geo.size.width),
                                     maxWidth: canDisplayLyrics
-                                        ? 0.50 * (geo.size.width) : .infinity)
+                                        ? 0.50 * (geo.size.width) : .infinity
+                                )
                             if canDisplayLyrics {
                                 LyricsPlayerViewWrapper(
                                     lyrics: viewmodel.currentlyPlayingLyrics,
                                     currentIndex: $viewmodel
-                                        .currentlyPlayingLyricsIndex, geo: geo
+                                        .currentlyPlayingLyricsIndex,
+                                    geo: geo
                                 )
                                 .frame(
                                     minWidth: 0.50 * (geo.size.width),
-                                    maxWidth: 0.50 * (geo.size.width))
+                                    maxWidth: 0.50 * (geo.size.width)
+                                )
                             }
                         }
                     }
                 }
                 .background {
                     ZStack {
-                        if !viewmodel.currentAlbumColor.isEmpty {
+                        if !cachedColors.isEmpty {
                             AnimatedMeshGradientView(
-                                colors: cachedColors)
+                                colors: cachedColors
+                            )
                         }
                         Color.black.opacity(0.1)
                     }
@@ -44,8 +48,9 @@ struct FullScreenView: View {
                     // 修复：确保视图出现时初始化颜色和歌词
                     cachedColors = meshColors()
                 }
-                .onChange(of: viewmodel.currentAlbumColor) {
-                    oldValue, newValue in
+                .onChange(of: viewmodel.currentTrack?.color) {
+                    oldValue,
+                    newValue in
                     cachedColors = meshColors()
                 }
                 // 修复：监听歌词变化以确保更新
@@ -136,8 +141,12 @@ struct FullScreenView: View {
             // 添加顶部间距
             let topSpacer = NSView(
                 frame: CGRect(
-                    x: 0, y: yOffset, width: geo.size.width,
-                    height: topSpacing))
+                    x: 0,
+                    y: yOffset,
+                    width: geo.size.width,
+                    height: topSpacing
+                )
+            )
             containerView.addSubview(topSpacer)
             yOffset += topSpacing
 
@@ -189,8 +198,12 @@ struct FullScreenView: View {
             // 添加底部间距
             let bottomSpacer = NSView(
                 frame: CGRect(
-                    x: 0, y: yOffset, width: geo.size.width,
-                    height: bottomSpacing))
+                    x: 0,
+                    y: yOffset,
+                    width: geo.size.width,
+                    height: bottomSpacing
+                )
+            )
             containerView.addSubview(bottomSpacer)
             yOffset += bottomSpacing
 
@@ -198,7 +211,9 @@ struct FullScreenView: View {
             containerView.frame = CGRect(
                 origin: .zero,
                 size: CGSize(
-                    width: geo.size.width, height: yOffset)
+                    width: geo.size.width,
+                    height: yOffset
+                )
             )
 
             // 更新内容大小
@@ -251,12 +266,16 @@ struct FullScreenView: View {
             let targetLineIndex = visibleIndex
 
             // 累加目标行之前所有行的高度
-            let yOffset = lineViews.prefix(targetLineIndex).reduce(CGFloat(0)) { partialResult, lineView in
+            let yOffset = lineViews.prefix(targetLineIndex).reduce(CGFloat(0)) {
+                partialResult,
+                lineView in
                 partialResult + lineView.totalHeight + padding
             }
 
             // 再加上目标行的一半高度让它居中
-            let targetY = yOffset - (scrollView.contentSize.height - topSpacing) / 2 + (lineViews[targetLineIndex].totalHeight / 2)
+            let targetY =
+                yOffset - (scrollView.contentSize.height - topSpacing) / 2
+                + (lineViews[targetLineIndex].totalHeight / 2)
             // 确保目标位置在有效范围内
             let maxY = documentView.frame.height - scrollView.contentSize.height
             let clampedY = min(max(targetY, 0), maxY)
@@ -265,9 +284,11 @@ struct FullScreenView: View {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 1  // 缩短动画时间
                 context.timingFunction = CAMediaTimingFunction(
-                    name: .easeInEaseOut)
+                    name: .easeInEaseOut
+                )
                 scrollView.contentView.animator().setBoundsOrigin(
-                    NSPoint(x: 0, y: clampedY))
+                    NSPoint(x: 0, y: clampedY)
+                )
             } completionHandler: {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     coordinator.isProgrammaticScroll = false
@@ -281,8 +302,12 @@ struct FullScreenView: View {
 
             let visibleRange =
                 max(
-                    0, currentIndex - 2)...min(
-                    lyrics.count - 1, currentIndex + 2)
+                    0,
+                    currentIndex - 2
+                )...min(
+                    lyrics.count - 1,
+                    currentIndex + 2
+                )
 
             for lineView in coordinator.lineViews {
                 if visibleRange.contains(lineView.lineIndex) {
@@ -313,7 +338,10 @@ struct FullScreenView: View {
                 isUserScrolling = true
                 NSObject.cancelPreviousPerformRequests(withTarget: self)
                 perform(
-                    #selector(resetScrollingFlag), with: nil, afterDelay: 1.0)
+                    #selector(resetScrollingFlag),
+                    with: nil,
+                    afterDelay: 1.0
+                )
             }
 
             @objc private func resetScrollingFlag() {
@@ -336,13 +364,18 @@ struct FullScreenView: View {
         private var animationStartTime: CFTimeInterval = 0
         private var animationDuration: CFTimeInterval = 0
         let totalHeight: CGFloat
-        private let translationLabel = NSTextField() // 将翻译标签改为属性
-                private var translationHeight: CGFloat = 0
-                private let maxWidth: CGFloat
+        private let translationLabel = NSTextField()  // 将翻译标签改为属性
+        private var translationHeight: CGFloat = 0
+        private let maxWidth: CGFloat
         init(
-            element: LyricLine, isActive: Bool, fontName: String,
-            currentIndex: Int?, lineIndex: Int, duration: Int?,
-            totalHeight: CGFloat, width: CGFloat
+            element: LyricLine,
+            isActive: Bool,
+            fontName: String,
+            currentIndex: Int?,
+            lineIndex: Int,
+            duration: Int?,
+            totalHeight: CGFloat,
+            width: CGFloat
         ) {
             self.element = element
             self.currentIndex = currentIndex
@@ -362,29 +395,38 @@ struct FullScreenView: View {
         private func setupViews(isActive: Bool, fontName: String) {
             // 配置标签
             configureLabel(
-                label: backgroundLabel, text: element.words, isActive: isActive,
-                isHighlight: false, fontName: fontName)
+                label: backgroundLabel,
+                text: element.words,
+                isActive: isActive,
+                isHighlight: false,
+                fontName: fontName
+            )
             configureLabel(
-                label: highlightLabel, text: element.words, isActive: isActive,
-                isHighlight: true, fontName: fontName)
+                label: highlightLabel,
+                text: element.words,
+                isActive: isActive,
+                isHighlight: true,
+                fontName: fontName
+            )
 
             // 添加翻译（如果存在）
-                        if let translation = element.attachments[.translation()]?.stringValue,
-                           !translation.isEmpty
-                        {
-                            translationHeight = 40 // 翻译行高度
-                            configureLabel(
-                                label: translationLabel,
-                                text: translation,
-                                isActive: isActive,
-                                isHighlight: true,
-                                fontName: fontName,
-                                isTranslation: true
-                            )
-                            addSubview(translationLabel)
-                        } else {
-                            translationHeight = 0
-                        }
+            if let translation = element.attachments[.translation()]?
+                .stringValue,
+                !translation.isEmpty
+            {
+                translationHeight = 40  // 翻译行高度
+                configureLabel(
+                    label: translationLabel,
+                    text: translation,
+                    isActive: isActive,
+                    isHighlight: true,
+                    fontName: fontName,
+                    isTranslation: true
+                )
+                addSubview(translationLabel)
+            } else {
+                translationHeight = 0
+            }
 
             // 添加子视图
             addSubview(backgroundLabel)
@@ -396,12 +438,18 @@ struct FullScreenView: View {
 
         func updateActiveState(isActive: Bool) {
             configureLabel(
-                label: backgroundLabel, text: element.words, isActive: isActive,
+                label: backgroundLabel,
+                text: element.words,
+                isActive: isActive,
                 isHighlight: false,
-                fontName: backgroundLabel.font?.fontName ?? "")
+                fontName: backgroundLabel.font?.fontName ?? ""
+            )
             configureLabel(
-                label: highlightLabel, text: element.words, isActive: isActive,
-                isHighlight: true, fontName: highlightLabel.font?.fontName ?? ""
+                label: highlightLabel,
+                text: element.words,
+                isActive: isActive,
+                isHighlight: true,
+                fontName: highlightLabel.font?.fontName ?? ""
             )
         }
 
@@ -444,7 +492,11 @@ struct FullScreenView: View {
                     isTranslation: true
                 )
                 translationLabel?.frame = CGRect(
-                    x: 0, y: 40, width: bounds.width, height: 20)
+                    x: 0,
+                    y: 40,
+                    width: bounds.width,
+                    height: 20
+                )
             } else {
                 // 移除翻译标签（如果存在）
                 for subview in subviews {
@@ -499,14 +551,18 @@ struct FullScreenView: View {
         }
 
         private func configureLabel(
-            label: NSTextField, text: String, isActive: Bool, isHighlight: Bool,
-            fontName: String, isTranslation: Bool = false
+            label: NSTextField,
+            text: String,
+            isActive: Bool,
+            isHighlight: Bool,
+            fontName: String,
+            isTranslation: Bool = false
         ) {
             // 添加换行支持
-                        label.cell?.wraps = true
-                        label.cell?.isScrollable = false
-                        label.lineBreakMode = .byWordWrapping
-                        label.maximumNumberOfLines = 0
+            label.cell?.wraps = true
+            label.cell?.isScrollable = false
+            label.lineBreakMode = .byWordWrapping
+            label.maximumNumberOfLines = 0
             label.stringValue = text
             label.isEditable = false
             label.isBordered = false
@@ -524,53 +580,57 @@ struct FullScreenView: View {
             } else {
                 label.textColor = NSColor.white.withAlphaComponent(0.5)
             }
-            
+
             let textHeight = calculateTextHeight(
-                            text: text,
-                            font: label.font,
-                            width: maxWidth
-                        )
-                        
-                        // 如果是翻译标签，更新高度
-                        if isTranslation {
-                            translationHeight = textHeight
-                        }
+                text: text,
+                font: label.font,
+                width: maxWidth
+            )
+
+            // 如果是翻译标签，更新高度
+            if isTranslation {
+                translationHeight = textHeight
+            }
         }
         // 计算文本高度
-                private func calculateTextHeight(text: String, font: NSFont?, width: CGFloat) -> CGFloat {
-                    guard let font = font else { return 40 }
-                    
-                    let textRect = (text as NSString).boundingRect(
-                        with: CGSize(width: width, height: .greatestFiniteMagnitude),
-                        options: [.usesLineFragmentOrigin, .usesFontLeading],
-                        attributes: [.font: font],
-                        context: nil
-                    )
-                    
-                    return max(40, textRect.height) // 最小高度40
-                }
+        private func calculateTextHeight(
+            text: String,
+            font: NSFont?,
+            width: CGFloat
+        ) -> CGFloat {
+            guard let font = font else { return 40 }
+
+            let textRect = (text as NSString).boundingRect(
+                with: CGSize(width: width, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: [.font: font],
+                context: nil
+            )
+
+            return max(40, textRect.height)  // 最小高度40
+        }
         override func layout() {
             super.layout()
             backgroundLabel.frame = CGRect(
-                            x: 0,
-                            y: 0,
-                            width: bounds.width,
-                            height: 60 // 增加高度以适应多行
-                        )
-                        highlightLabel.frame = backgroundLabel.frame
-                        
-                        // 翻译标签布局
-                        if translationHeight > 0 {
-                            translationLabel.frame = CGRect(
-                                x: 0,
-                                y: backgroundLabel.frame.maxY + 5,
-                                width: bounds.width,
-                                height: translationHeight
-                            )
-                            translationLabel.isHidden = false
-                        } else {
-                            translationLabel.isHidden = true
-                        }
+                x: 0,
+                y: 0,
+                width: bounds.width,
+                height: 60  // 增加高度以适应多行
+            )
+            highlightLabel.frame = backgroundLabel.frame
+
+            // 翻译标签布局
+            if translationHeight > 0 {
+                translationLabel.frame = CGRect(
+                    x: 0,
+                    y: backgroundLabel.frame.maxY + 5,
+                    width: bounds.width,
+                    height: translationHeight
+                )
+                translationLabel.isHidden = false
+            } else {
+                translationLabel.isHidden = true
+            }
 
             // 更新翻译标签位置和高度
             for subview in subviews {
@@ -578,7 +638,8 @@ struct FullScreenView: View {
                     label != backgroundLabel && label != highlightLabel
                 {
                     label.frame = CGRect(
-                        x: 0, y: 40,
+                        x: 0,
+                        y: 40,
                         width: bounds.width,
                         height: totalHeight - 40  // 使用剩余高度
                     )
@@ -597,7 +658,10 @@ struct FullScreenView: View {
             // 设置动画开始时间
             animationStartTime = CACurrentMediaTime()
             // 使用新的 displayLink API
-            displayLink = self.displayLink(target: self, selector: #selector(updateFadeAnimation))
+            displayLink = self.displayLink(
+                target: self,
+                selector: #selector(updateFadeAnimation)
+            )
             displayLink?.add(to: .main, forMode: .common)
         }
 
@@ -635,13 +699,15 @@ struct FullScreenView: View {
     }
 
     func meshColors() -> [Color] {
-        var result = viewmodel.currentAlbumColor
-        while result.count < 9 {
-            if let color = viewmodel.currentAlbumColor.randomElement() {
-                result.append(color)
+        if var result = viewmodel.currentTrack?.color {
+            while result.count < 9 {
+                if let color = viewmodel.currentTrack?.color?.randomElement() {
+                    result.append(color)
+                }
             }
+            return result
         }
-        return result
+        return []
     }
 
     @ViewBuilder var albumArt: some View {
@@ -654,13 +720,18 @@ struct FullScreenView: View {
                     .clipShape(
                         .rect(
                             cornerRadii: .init(
-                                topLeading: 10, bottomLeading: 10,
-                                bottomTrailing: 10, topTrailing: 10))
+                                topLeading: 10,
+                                bottomLeading: 10,
+                                bottomTrailing: 10,
+                                topTrailing: 10
+                            )
+                        )
                     )
                     .shadow(radius: 5)
                     .frame(
                         width: canDisplayLyrics ? 450 : 700,
-                        height: canDisplayLyrics ? 450 : 700)
+                        height: canDisplayLyrics ? 450 : 700
+                    )
             } else {
                 Image(systemName: "music.note.list")
                     .resizable()
@@ -670,17 +741,27 @@ struct FullScreenView: View {
                     .clipShape(
                         .rect(
                             cornerRadii: .init(
-                                topLeading: 10, bottomLeading: 10,
-                                bottomTrailing: 10, topTrailing: 10))
+                                topLeading: 10,
+                                bottomLeading: 10,
+                                bottomTrailing: 10,
+                                topTrailing: 10
+                            )
+                        )
                     )
                     .shadow(radius: 5)
                     .frame(
                         width: canDisplayLyrics ? 450 : 650,
-                        height: canDisplayLyrics ? 450 : 650)
+                        height: canDisplayLyrics ? 450 : 650
+                    )
             }
             Group {
                 Text(verbatim: viewmodel.currentTrack?.name ?? "")
-                    .font(.custom(NSFont.boldSystemFont(ofSize: 28).fontName, size: 28))
+                    .font(
+                        .custom(
+                            NSFont.boldSystemFont(ofSize: 28).fontName,
+                            size: 28
+                        )
+                    )
                     .bold()
                     .foregroundStyle(.white)
                     .padding(.top, 30)
@@ -688,7 +769,12 @@ struct FullScreenView: View {
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: (canDisplayLyrics ? 450 : 650) * 0.9)
                 Text(verbatim: viewmodel.currentTrack?.artist ?? "")
-                    .font(.custom(NSFont.boldSystemFont(ofSize: 22).fontName, size: 22))
+                    .font(
+                        .custom(
+                            NSFont.boldSystemFont(ofSize: 22).fontName,
+                            size: 22
+                        )
+                    )
                     .foregroundStyle(.white)
                     .opacity(0.7)
             }
@@ -706,5 +792,3 @@ struct FullScreenView: View {
     }
 
 }
-
-

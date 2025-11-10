@@ -1,17 +1,22 @@
 import Foundation
+
 public class NetworkUtil {
-    
+
     var viewModel: ViewModel
     let fakeSpotifyUserAgentconfig = URLSessionConfiguration.default
     let fakeSpotifyUserAgentSession: URLSession
-    
+    let coverCacheActor = CoverCache()
     init(viewModel: ViewModel) {
         fakeSpotifyUserAgentSession = URLSession(
-            configuration: fakeSpotifyUserAgentconfig)
+            configuration: fakeSpotifyUserAgentconfig
+        )
         self.viewModel = viewModel
     }
     func fetchLyrics(
-        trackName: String, artist: String, trackID: String, album: String,
+        trackName: String,
+        artist: String,
+        trackID: String,
+        album: String,
         genre: String
     ) async throws -> [LyricLine] {
         await MainActor.run {
@@ -26,7 +31,8 @@ public class NetworkUtil {
             let originalNameResult = try await fetchOriginalName(
                 trackName: trackName,
                 artist: artist,
-                album: album)
+                album: album
+            )
             Log.general.info("日文原名: \(JSON.stringify(originalNameResult))")
             if !originalNameResult.trackName.isEmpty {
                 effectiveTrackName = originalNameResult.trackName
@@ -40,25 +46,29 @@ public class NetworkUtil {
         }
         // 尝试网易云音乐
         var lyrics = await fetchNetEaseLyrics(
-            trackName: effectiveTrackName, artist: effectiveArtist,
+            trackName: effectiveTrackName,
+            artist: effectiveArtist,
             trackID: trackID,  // trackID 似乎未使用，但保持签名一致
-            album: effectiveAlbum)
+            album: effectiveAlbum
+        )
         if !lyrics.isEmpty {
             return lyrics
         }
-        
+
         // 尝试 QQ 音乐
         lyrics = await fetchQQLyrics(
-            trackName: effectiveTrackName, artist: effectiveArtist,
-            album: effectiveAlbum)
+            trackName: effectiveTrackName,
+            artist: effectiveArtist,
+            album: effectiveAlbum
+        )
         if !lyrics.isEmpty {
             return lyrics
         }
-        
+
         // 如果上述都失败，并且收集到了候选歌曲，则触发手动选择
         // 先获取QQ音乐的封面
         await fetchAlbumCover()
-        
+
         // 检查是否有候选歌曲，并触发手动选择流程
         // 在 MainActor 上更新 UI 相关状态
         let shouldAskForManualSelection = await MainActor.run { () -> Bool in
@@ -73,33 +83,36 @@ public class NetworkUtil {
             Log.general.info("等待用户手动选择...")
             // 为 continuation 添加超时机制
             let continuationTimeout: TimeInterval = 10.0  // 例如 10 秒超时
-            
+
             do {
                 let selectedSong: CandidateSong =
-                try await withCheckedThrowingContinuation { continuation in
-                    Task {
-                        try? await Task.sleep(
-                            nanoseconds: UInt64(
-                                continuationTimeout * 1_000_000_000))
-                        await MainActor.run {
-                            if self.viewModel.onCandidateSelected != nil {
-                                Log.general.warning("⚠️ 选择超时")
-                                self.viewModel.onCandidateSelected = nil
-                                self.viewModel.needNanualSelection = false
-                                continuation.resume(
-                                    throwing: FetchError
-                                        .manualSelectionTimeout)
+                    try await withCheckedThrowingContinuation { continuation in
+                        Task {
+                            try? await Task.sleep(
+                                nanoseconds: UInt64(
+                                    continuationTimeout * 1_000_000_000
+                                )
+                            )
+                            await MainActor.run {
+                                if self.viewModel.onCandidateSelected != nil {
+                                    Log.general.warning("⚠️ 选择超时")
+                                    self.viewModel.onCandidateSelected = nil
+                                    self.viewModel.needNanualSelection = false
+                                    continuation.resume(
+                                        throwing: FetchError
+                                            .manualSelectionTimeout
+                                    )
+                                }
+                            }
+                        }
+
+                        Task { @MainActor in
+                            self.viewModel.onCandidateSelected = { song in
+                                self.viewModel.onCandidateSelected = nil  // 清理回调
+                                continuation.resume(returning: song)
                             }
                         }
                     }
-                    
-                    Task { @MainActor in
-                        self.viewModel.onCandidateSelected = { song in
-                            self.viewModel.onCandidateSelected = nil  // 清理回调
-                            continuation.resume(returning: song)
-                        }
-                    }
-                }
                 // 用户选择后，根据 ID 获取歌词
                 return try await fetchLyricsByID(song: selectedSong)
             } catch FetchError.manualSelectionTimeout {
@@ -117,25 +130,40 @@ public class NetworkUtil {
         }
         return []
     }
-    
+
     // 定义一个错误类型用于超时
     enum FetchError: Error {
         case manualSelectionTimeout
         case apiError(String)
         case parsingError(String)
     }
-    
-    func fetchNetEaseArtist(name: String) async throws -> Artist?{
-        let request = URLRequest(url: URL(string: "https://neteasecloudmusicapi-ten-wine.vercel.app/cloudsearch?keywords=\(name)&limit=1&type=100")!)
-        
+
+    func fetchNetEaseArtist(name: String) async throws -> Artist? {
+
+        if let url = await coverCacheActor.get(for: name) {
+            Log.backend.debug("命中缓存 \(name) 封面：\(url)")
+            return Artist(name: name, url: url)
+        }
+
+        let request = URLRequest(
+            url: URL(
+                string:
+                    "https://neteasecloudmusicapi-ten-wine.vercel.app/cloudsearch?keywords=\(name)&limit=1&type=100"
+            )!
+        )
+
         let response = try await fakeSpotifyUserAgentSession.data(for: request)
         let decoder = JSONDecoder()
-        let netEaseArtists = try decoder.decode(NetEaseArtist.self, from: response.0)
+        let netEaseArtists = try decoder.decode(
+            NetEaseArtist.self,
+            from: response.0
+        )
         guard let netEaseArtist = netEaseArtists.result.artists.first else {
             return nil
         }
         let artist = Artist(name: netEaseArtist.name, url: netEaseArtist.picUrl)
         Log.backend.info("找到歌手 \(name) 封面：\(artist.url)")
+        await coverCacheActor.set(artist.url, for: name)
         return artist
     }
     func fetchSimilarArtistsAndCovers() {
@@ -154,7 +182,9 @@ public class NetworkUtil {
                         if Task.isCancelled { break }
                         let name = await viewModel.similarArtists[i].name
                         group.addTask {
-                            let cover = try? await self.fetchNetEaseArtist(name: name)
+                            let cover = try? await self.fetchNetEaseArtist(
+                                name: name
+                            )
                             return (i, cover?.url)
                         }
                     }
@@ -174,7 +204,10 @@ public class NetworkUtil {
         }
     }
     func fetchNetEaseLyrics(
-        trackName: String, artist: String, trackID: String, album: String
+        trackName: String,
+        artist: String,
+        trackID: String,
+        album: String
     ) async -> [LyricLine] {
         if let url = URL(
             string:
@@ -183,34 +216,42 @@ public class NetworkUtil {
             do {
                 let request = URLRequest(url: url)
                 let urlResponseAndData =
-                try await fakeSpotifyUserAgentSession.data(
-                    for: request)
+                    try await fakeSpotifyUserAgentSession.data(
+                        for: request
+                    )
                 let decoder = JSONDecoder()
                 let neteasesearch = try decoder.decode(
-                    NetEaseSearch.self, from: urlResponseAndData.0)
+                    NetEaseSearch.self,
+                    from: urlResponseAndData.0
+                )
                 Log.general.info("netease 找到歌曲：\(neteasesearch.result.songs)")
-                
+
                 let matchedSong = neteasesearch.result.songs.first {
                     $0.name.normalized == trackName.normalized
-                    && $0.ar.contains(where: {
-                        $0.name.normalized == artist.normalized
-                    })
-                    && ($0.al.name.normalized == album.normalized
-                        || album.normalized.contains(
-                            $0.al.name.normalized)
-                        || $0.al.name.normalized.contains(
-                            album.normalized))
+                        && $0.ar.contains(where: {
+                            $0.name.normalized == artist.normalized
+                        })
+                        && ($0.al.name.normalized == album.normalized
+                            || album.normalized.contains(
+                                $0.al.name.normalized
+                            )
+                            || $0.al.name.normalized.contains(
+                                album.normalized
+                            ))
                 }
-                
+
                 guard let song = matchedSong else {
-                    Log.general.info("❌ 没有匹配到 netease 歌曲：trackName=\(trackName), artist=\(artist), album=\(album)")
+                    Log.general.info(
+                        "❌ 没有匹配到 netease 歌曲：trackName=\(trackName), artist=\(artist), album=\(album)"
+                    )
                     // Append all netease songs as candidates
                     for song in neteasesearch.result.songs {
                         let candidate = CandidateSong(
                             id: song.id.codingKey.stringValue,
                             name: song.name,
                             artist: song.ar.map { $0.name }.joined(
-                                separator: ", "),
+                                separator: ", "
+                            ),
                             album: song.al.name,
                             albumId: song.al.id.codingKey.stringValue,
                             albumCover: song.al.picUrl,
@@ -222,38 +263,47 @@ public class NetworkUtil {
                     }
                     return []
                 }
-                
+
                 let lyricRequest = URLRequest(
                     url: URL(
                         string:
                             "https://neteasecloudmusicapi-ten-wine.vercel.app/lyric?id=\(song.id)"
-                    )!)
+                    )!
+                )
                 let urlResponseAndDataLyrics =
-                try await fakeSpotifyUserAgentSession.data(
-                    for: lyricRequest)
-                
+                    try await fakeSpotifyUserAgentSession.data(
+                        for: lyricRequest
+                    )
+
                 let neteaseLyrics = try decoder.decode(
-                    NetEaseLyrics.self, from: urlResponseAndDataLyrics.0)
-                
+                    NetEaseLyrics.self,
+                    from: urlResponseAndDataLyrics.0
+                )
+
                 guard let neteaselrc = neteaseLyrics.lrc,
-                      let neteaseLrcString = neteaselrc.lyric
+                    let neteaseLrcString = neteaselrc.lyric
                 else {
                     return []
                 }
-                
+
                 let originalParser = LyricsParser(
-                    lyrics: neteaseLrcString, format: .netEase)
+                    lyrics: neteaseLrcString,
+                    format: .netEase
+                )
                 var finalLyrics = originalParser.lyrics
-                
+
                 // 合并歌词翻译
                 if let tlyric = neteaseLyrics.tlyric,
-                   let tlyricString = tlyric.lyric, !tlyricString.isEmpty
+                    let tlyricString = tlyric.lyric, !tlyricString.isEmpty
                 {
                     let translationParser = LyricsParser(
-                        lyrics: tlyricString, format: .netEase)
+                        lyrics: tlyricString,
+                        format: .netEase
+                    )
                     if !translationParser.lyrics.isEmpty {
                         finalLyrics = originalParser.mergeLyrics(
-                            translation: translationParser)
+                            translation: translationParser
+                        )
                     }
                 }
                 return finalLyrics
@@ -263,9 +313,9 @@ public class NetworkUtil {
         }
         return []
     }
-    
+
     func fetchQQLyrics(trackName: String, artist: String, album: String)
-    async -> [LyricLine]
+        async -> [LyricLine]
     {
         if let url = URL(
             string:
@@ -274,45 +324,56 @@ public class NetworkUtil {
             do {
                 let request = URLRequest(url: url)
                 let urlResponseAndData =
-                try await fakeSpotifyUserAgentSession.data(
-                    for: request)
+                    try await fakeSpotifyUserAgentSession.data(
+                        for: request
+                    )
                 guard
                     let rawText = String(
-                        data: urlResponseAndData.0, encoding: .utf8),
+                        data: urlResponseAndData.0,
+                        encoding: .utf8
+                    ),
                     let rangeStart = rawText.range(of: "("),
                     let rangeEnd = rawText.range(of: ")", options: .backwards)
                 else {
                     return []
                 }
                 let jsonString = String(
-                    rawText[rangeStart.upperBound..<rangeEnd.lowerBound])
+                    rawText[rangeStart.upperBound..<rangeEnd.lowerBound]
+                )
                 guard let jsonData = jsonString.data(using: .utf8) else {
                     return []
                 }
                 let decoder = JSONDecoder()
                 let QQSearchData = try decoder.decode(
-                    QQSearch.self, from: jsonData)
+                    QQSearch.self,
+                    from: jsonData
+                )
                 Log.general.info("qq 找到歌曲:\(QQSearchData.data.song.list)")
                 let QQSong = QQSearchData.data.song.list.first {
                     $0.songname.normalized == trackName.normalized
-                    && $0.singer.contains(where: {
-                        $0.name.normalized == artist.normalized
-                    })
-                    && ($0.albumname.normalized == album.normalized
-                        || album.normalized.contains(
-                            $0.albumname.normalized)
-                        || $0.albumname.normalized.contains(
-                            album.normalized))
+                        && $0.singer.contains(where: {
+                            $0.name.normalized == artist.normalized
+                        })
+                        && ($0.albumname.normalized == album.normalized
+                            || album.normalized.contains(
+                                $0.albumname.normalized
+                            )
+                            || $0.albumname.normalized.contains(
+                                album.normalized
+                            ))
                 }
                 if QQSong == nil {
-                    Log.general.info("❌ 没有匹配到 QQ 歌曲：trackName=\(trackName), artist=\(artist), album=\(album)")
+                    Log.general.info(
+                        "❌ 没有匹配到 QQ 歌曲：trackName=\(trackName), artist=\(artist), album=\(album)"
+                    )
                     // Append all QQ songs as candidates
                     for song in QQSearchData.data.song.list {
                         let candidate = CandidateSong(
                             id: song.songmid,
                             name: song.songname,
                             artist: song.singer.map { $0.name }.joined(
-                                separator: ", "),
+                                separator: ", "
+                            ),
                             album: song.albumname,
                             albumId: song.albummid,
                             albumCover: "",
@@ -330,39 +391,53 @@ public class NetworkUtil {
                 )!
                 var lyricRequest = URLRequest(url: url)
                 lyricRequest.setValue(
-                    "y.qq.com/portal/player.html", forHTTPHeaderField: "Referer"
+                    "y.qq.com/portal/player.html",
+                    forHTTPHeaderField: "Referer"
                 )
-                
+
                 let lyricResponseAndData =
-                try await fakeSpotifyUserAgentSession.data(
-                    for: lyricRequest)
-                
+                    try await fakeSpotifyUserAgentSession.data(
+                        for: lyricRequest
+                    )
+
                 guard
                     let lyrRawText = String(
-                        data: lyricResponseAndData.0, encoding: .utf8),
+                        data: lyricResponseAndData.0,
+                        encoding: .utf8
+                    ),
                     let lyrRangeStart = lyrRawText.range(of: "("),
                     let lyrRangeEnd = lyrRawText.range(
-                        of: ")", options: .backwards)
+                        of: ")",
+                        options: .backwards
+                    )
                 else {
                     return []
                 }
                 let lyrJsonString = String(
                     lyrRawText[
-                        lyrRangeStart.upperBound..<lyrRangeEnd.lowerBound])
+                        lyrRangeStart.upperBound..<lyrRangeEnd.lowerBound
+                    ]
+                )
                 guard let lyrJsonData = lyrJsonString.data(using: .utf8) else {
                     return []
                 }
-                
+
                 let qqLyricsData = try decoder.decode(
-                    QQLyrics.self, from: lyrJsonData)
+                    QQLyrics.self,
+                    from: lyrJsonData
+                )
                 guard let lyricString = qqLyricsData.lyricString else {
                     return []
                 }
                 let lyricsParser = LyricsParser(
-                    lyrics: lyricString, format: .qq)
+                    lyrics: lyricString,
+                    format: .qq
+                )
                 if let tlyricString = qqLyricsData.transString {
                     let tlyricsParser = LyricsParser(
-                        lyrics: tlyricString, format: .qq)
+                        lyrics: tlyricString,
+                        format: .qq
+                    )
                     return lyricsParser.mergeLyrics(translation: tlyricsParser)
                 }
                 return lyricsParser.lyrics
@@ -373,16 +448,17 @@ public class NetworkUtil {
         return []
     }
     func fetchOriginalName(trackName: String, artist: String, album: String)
-    async throws
-    -> OriginalName
+        async throws
+        -> OriginalName
     {
         let url = URL(string: "https://api.siliconflow.cn/v1/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(
-            "Bearer your-key",
-            forHTTPHeaderField: "Authorization")
+            "Bearer \(Key.siliconFlow)",
+            forHTTPHeaderField: "Authorization"
+        )
         let payload: [String: Any] = [
             "model": "deepseek-ai/DeepSeek-R1",
             "messages": [
@@ -398,10 +474,12 @@ public class NetworkUtil {
             ],
             "stream": false,
         ]
-        
+
         request.httpBody = try JSONSerialization.data(
-            withJSONObject: payload, options: [])
-        
+            withJSONObject: payload,
+            options: []
+        )
+
         let (data, _) = try await fakeSpotifyUserAgentSession.data(for: request)
         struct CompletionResponse: Decodable {
             struct Choice: Decodable {
@@ -416,15 +494,21 @@ public class NetworkUtil {
         let response = try decoder.decode(CompletionResponse.self, from: data)
         let rawContent = response.choices.first?.message.content ?? ""
         let originalName = rawContent.trimmingCharacters(
-            in: CharacterSet(charactersIn: "<>"))
+            in: CharacterSet(charactersIn: "<>")
+        )
         let artist = rawContent.trimmingCharacters(
-            in: CharacterSet(charactersIn: "{}"))
+            in: CharacterSet(charactersIn: "{}")
+        )
         let album = rawContent.trimmingCharacters(
-            in: CharacterSet(charactersIn: "[]"))
+            in: CharacterSet(charactersIn: "[]")
+        )
         return OriginalName(
-            trackName: originalName, artist: artist, album: album)
+            trackName: originalName,
+            artist: artist,
+            album: album
+        )
     }
-    
+
     func fetchLyricsByID(song: CandidateSong) async throws -> [LyricLine] {
         switch song.source {
         case .netEase:
@@ -432,28 +516,35 @@ public class NetworkUtil {
                 url: URL(
                     string:
                         "https://neteasecloudmusicapi-ten-wine.vercel.app/lyric?id=\(song.id)"
-                )!)
+                )!
+            )
             let urlResponseAndDataLyrics =
-            try await fakeSpotifyUserAgentSession.data(for: lyricRequest)
+                try await fakeSpotifyUserAgentSession.data(for: lyricRequest)
             let decoder = JSONDecoder()
             let neteaseLyrics = try decoder.decode(
-                NetEaseLyrics.self, from: urlResponseAndDataLyrics.0)
-            
+                NetEaseLyrics.self,
+                from: urlResponseAndDataLyrics.0
+            )
+
             guard let neteaselrc = neteaseLyrics.lrc,
-                  let neteaseLrcString = neteaselrc.lyric
+                let neteaseLrcString = neteaselrc.lyric
             else {
                 return []
             }
-            
+
             let originalParser = LyricsParser(
-                lyrics: neteaseLrcString, format: .netEase)
-            
+                lyrics: neteaseLrcString,
+                format: .netEase
+            )
+
             guard let tlrc = neteaseLyrics.tlyric, let tlrcString = tlrc.lyric
             else {
                 return originalParser.lyrics
             }
             let translationParser = LyricsParser(
-                lyrics: tlrcString, format: .netEase)
+                lyrics: tlrcString,
+                format: .netEase
+            )
             return originalParser.mergeLyrics(translation: translationParser)
         case .qq:
             let url = URL(
@@ -462,34 +553,43 @@ public class NetworkUtil {
             )!
             var lyricRequest = URLRequest(url: url)
             lyricRequest.setValue(
-                "y.qq.com/portal/player.html", forHTTPHeaderField: "Referer")
-            
+                "y.qq.com/portal/player.html",
+                forHTTPHeaderField: "Referer"
+            )
+
             let lyricResponseAndData =
-            try await fakeSpotifyUserAgentSession.data(for: lyricRequest)
-            
+                try await fakeSpotifyUserAgentSession.data(for: lyricRequest)
+
             guard
                 let lyrRawText = String(
-                    data: lyricResponseAndData.0, encoding: .utf8),
+                    data: lyricResponseAndData.0,
+                    encoding: .utf8
+                ),
                 let lyrRangeStart = lyrRawText.range(of: "("),
                 let lyrRangeEnd = lyrRawText.range(of: ")", options: .backwards)
             else {
                 return []
             }
             let lyrJsonString = String(
-                lyrRawText[lyrRangeStart.upperBound..<lyrRangeEnd.lowerBound])
+                lyrRawText[lyrRangeStart.upperBound..<lyrRangeEnd.lowerBound]
+            )
             guard let lyrJsonData = lyrJsonString.data(using: .utf8) else {
                 return []
             }
             let decoder = JSONDecoder()
             let qqLyricsData = try decoder.decode(
-                QQLyrics.self, from: lyrJsonData)
+                QQLyrics.self,
+                from: lyrJsonData
+            )
             guard let lyricString = qqLyricsData.lyricString else {
                 return []
             }
             let lyricsParser = LyricsParser(lyrics: lyricString, format: .qq)
             if let tlyricString = qqLyricsData.transString {
                 let tlyricsParser = LyricsParser(
-                    lyrics: tlyricString, format: .qq)
+                    lyrics: tlyricString,
+                    format: .qq
+                )
                 return lyricsParser.mergeLyrics(translation: tlyricsParser)
             }
             return lyricsParser.lyrics
@@ -510,25 +610,25 @@ public class NetworkUtil {
             }
             return qqCandidates
         }
-        
+
         await withTaskGroup(of: (String, String).self) { group in
             for id in qq {
                 group.addTask {
                     let cover =
-                    (try? await self.fetchQQAlbumCoverByID(id: id)) ?? ""
+                        (try? await self.fetchQQAlbumCoverByID(id: id)) ?? ""
                     return (id, cover)
                 }
             }
-            
+
             let coverMap = await group.reduce(into: [String: String]()) {
                 $0[$1.0] = $1.1
             }
-            
+
             await MainActor.run {
                 for i in 0..<viewModel.allCandidates.count {
                     let candidate = viewModel.allCandidates[i]
                     if candidate.source == .qq,
-                       let cover = coverMap[candidate.albumId]
+                        let cover = coverMap[candidate.albumId]
                     {
                         viewModel.allCandidates[i].albumCover = cover
                     }
@@ -542,9 +642,11 @@ public class NetworkUtil {
                 url: URL(
                     string:
                         "https://c.y.qq.com/v8/fcg-bin/musicmall.fcg?albummid=\(id)&format=json&inCharset=utf-8&outCharset=utf-8&cmd=get_album_buy_page"
-                )!)
+                )!
+            )
             let albumData = try await fakeSpotifyUserAgentSession.data(
-                for: albumRequest)
+                for: albumRequest
+            )
             let decoder = JSONDecoder()
             let album = try decoder.decode(QQAlbum.self, from: albumData.0)
             guard let pic = album.data.headpiclist.first?.picurl else {
@@ -553,22 +655,36 @@ public class NetworkUtil {
             }
             Log.general.info("专辑 url: \(pic) ")
             return pic
-            
+
         } catch {
             Log.general.error("获取专辑 \(error)")
         }
         return ""
     }
     func fetchSimilarArtists(name: String) async throws -> [Artist] {
-        let request = URLRequest(url: URL(string: "http://ws.audioscrobbler.com/2.0/?method=artist.getsimilar&artist=\(name)&api_key=key&limit=10&format=json")!)
+        let request = URLRequest(
+            url: URL(
+                string:
+                    "http://ws.audioscrobbler.com/2.0/?method=artist.getsimilar&artist=\(name)&api_key=\(Key.lastfm)&limit=10&format=json"
+            )!
+        )
         let response = try await fakeSpotifyUserAgentSession.data(for: request)
         let decoder = JSONDecoder()
-        let artistResponse = try decoder.decode(ArtistResponse.self, from: response.0)
+        let artistResponse = try decoder.decode(
+            ArtistResponse.self,
+            from: response.0
+        )
         Log.general.info("response: \(JSON.stringify(artistResponse))")
-        guard let similars = artistResponse.similarartists?.artist else {return []}
+        guard let similars = artistResponse.similarartists?.artist else {
+            return []
+        }
         var similarArtists: [Artist] = []
-        similars.forEach{
-            let similarArtist = Artist(name: $0.name, url: $0.url ?? "", mbid: $0.mbid ?? "")
+        similars.forEach {
+            let similarArtist = Artist(
+                name: $0.name,
+                url: $0.url,
+                mbid: $0.mbid ?? ""
+            )
             similarArtists.append(similarArtist)
         }
         return similarArtists
@@ -578,12 +694,58 @@ public class NetworkUtil {
 extension String {
     var normalized: String {
         self
-            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(
+                of: #"\s+"#,
+                with: " ",
+                options: .regularExpression
+            )
             .replacingOccurrences(of: "(", with: "-")
             .replacingOccurrences(of: ")", with: "-")
             .replacingOccurrences(of: "：", with: "-")
             .replacingOccurrences(of: "（", with: "-")
             .replacingOccurrences(of: "）", with: "-")
             .lowercased()
+    }
+}
+actor CoverCache {
+    private var cache: [String: String] = [:]
+    private var keysOrder: [String] = []
+    private let maxSize: Int
+    init(maxSize: Int = 100) {
+        self.maxSize = maxSize
+    }
+    func get(for key: String) -> String? {
+        return cache[key]
+    }
+
+    func set(_ url: String, for key: String) {
+        if cache[key] == nil {
+            keysOrder.append(key)
+        }
+        cache[key] = url
+        enforceLimit()
+    }
+    private func enforceLimit() {
+        while keysOrder.count > maxSize {
+            let oldestKey = keysOrder.removeFirst()
+            cache[oldestKey] = nil
+        }
+    }
+
+}
+actor NetWorkQueue {
+    private var queue: [String] = []
+
+    func contains(_ key: String) -> Bool {
+        return queue.contains(key)
+    }
+
+    func append(_ key: String) {
+        queue.append(key)
+    }
+    func remove(_ key: String) {
+        if let index = queue.firstIndex(of: key) {
+            queue.remove(at: index)
+        }
     }
 }

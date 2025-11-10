@@ -20,31 +20,42 @@ class ViewModel: ObservableObject {
     @Published var translationExists: Bool = true
     @Published var karaokeShowMultilingual: Bool = true
     @Published var isViewLyricsShow: Bool = false
-    @Published var isLyricsPrepared: Bool = false
-    @Published var currentAlbumColor: [Color] = []
+    @Published var isLyricsPlaying: Bool = false
     @Published var allCandidates: [CandidateSong] = []
     @Published var needNanualSelection: Bool = false
     @Published var currentTrack: TrackInfo?
     @Published var scrollProxy: ScrollViewProxy?
     @Published var isCurrentTrackPlaying: Bool = false
     @Published var similarArtists: [Artist] = []
+    @Published var currentAlbum: String?
+    @Published var currentSong: String?
     var onCandidateSelected: ((CandidateSong) -> Void)?  // ❗️等待用的回调
 
-    var appleMusicScript: MusicApplication? = SBApplication(
-        bundleIdentifier: "com.apple.Music")
+    lazy var appleMusicScript: MusicApplication? = SBApplication(
+        bundleIdentifier: "com.apple.Music"
+    )
     private var currentLyricsUpdaterTask: Task<Void, Error>?
 
     private var cancellables = Set<AnyCancellable>()
 
     private func lyricUpdater() async throws {
         repeat {
-            Log.general.info("lyric index: \(String(describing: self.currentlyPlayingLyricsIndex))")
-            guard let playerPosition = appleMusicScript?.playerPosition else {
+            Log.general.debug(
+                "lyric index: \(String(describing: self.currentlyPlayingLyricsIndex))"
+            )
+            guard let script = self.appleMusicScript else {
+                Log.general.info("no script")
+                // pauses the timer bc there's no player position
+                stopLyricUpdater()
+                return
+            }
+            guard let playerPosition = script.playerPosition else {
                 Log.general.info("no player position hence stopped")
                 // pauses the timer bc there's no player position
                 stopLyricUpdater()
                 return
             }
+            Log.general.debug("script player position: \(playerPosition)")
             // add a 700 (milisecond?) delay to offset the delta between spotify lyrics and apple music songs (or maybe the way apple music delivers playback position)
             // No need for Spotify Connect delay or fullscreen, this is APPLE MUSIC
             let currentTime = playerPosition * 1000 + 400
@@ -62,9 +73,11 @@ class ViewModel: ObservableObject {
 
             let nextTimestamp = currentlyPlayingLyrics[lastIndex].startTimeMS
             let diff = nextTimestamp - currentTime
-            Log.general.info("current time: \(currentTime). next time: \(nextTimestamp). the difference is \(diff)")
+            Log.general.debug(
+                "current time: \(currentTime). next time: \(nextTimestamp). the difference is \(diff)"
+            )
             try await Task.sleep(nanoseconds: UInt64(1_000_000 * diff))
-            Log.general.info("last index: \(lastIndex)")
+            Log.general.debug("last index: \(lastIndex)")
             if currentlyPlayingLyrics.count > lastIndex {
                 withAnimation(.linear(duration: 0.2)) {
                     currentlyPlayingLyricsIndex = lastIndex
@@ -72,13 +85,17 @@ class ViewModel: ObservableObject {
             } else {
                 currentlyPlayingLyricsIndex = nil
             }
-            Log.general.info("current lyrics index is now \(String(describing: self.currentlyPlayingLyricsIndex))")
+            Log.general.info(
+                "current lyrics index is now \(String(describing: self.currentlyPlayingLyricsIndex))"
+            )
         } while !Task.isCancelled
     }
 
     func startLyricUpdater() {
-        Log.general.info("start update task")
-        Log.general.info("isViewLyricsShow: \(self.isViewLyricsShow), lyrics.isEmpty: \(self.currentlyPlayingLyrics.isEmpty)")
+        Log.general.debug("start update task")
+        Log.general.debug(
+            "isViewLyricsShow: \(self.isViewLyricsShow), lyrics.isEmpty: \(self.currentlyPlayingLyrics.isEmpty)"
+        )
         currentLyricsUpdaterTask?.cancel()
         currentLyricsUpdaterTask = Task {
             do {
@@ -90,9 +107,7 @@ class ViewModel: ObservableObject {
     }
 
     func stopLyricUpdater() {
-        Log.general.info("stop lyric updater")
-//        currentlyPlayingLyricsIndex = nil
-//        isLyricsPrepared = false
+        Log.general.debug("stop lyric updater")
         currentLyricsUpdaterTask?.cancel()
     }
 
@@ -157,7 +172,9 @@ extension NSImage {
         context.draw(cgImage, in: CGRect(origin: .zero, size: size))
         guard let data = context.data else { return nil }
         let ptr = data.bindMemory(
-            to: UInt8.self, capacity: Int(size.width * size.height * 4))
+            to: UInt8.self,
+            capacity: Int(size.width * size.height * 4)
+        )
 
         var points: [(CGFloat, CGFloat, CGFloat)] = []
 
@@ -182,7 +199,9 @@ extension NSImage {
         // 简易 k-means 聚类
         var centroids = points.shuffled().prefix(k)
         var clusters: [[(CGFloat, CGFloat, CGFloat)]] = Array(
-            repeating: [], count: k)
+            repeating: [],
+            count: k
+        )
 
         for _ in 0..<10 {
             clusters = Array(repeating: [], count: k)
@@ -216,10 +235,13 @@ extension NSImage {
             }
             let count = CGFloat($0.element.count)
             return Color(
-                red: sum.0 / count, green: sum.1 / count, blue: sum.2 / count)
+                red: sum.0 / count,
+                green: sum.1 / count,
+                blue: sum.2 / count
+            )
         }
     }
-    
+
 }
 struct CandidateSong: Sendable {
     let id: String

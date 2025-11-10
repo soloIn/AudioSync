@@ -8,8 +8,9 @@
 import AppKit
 import CoreAudio
 import Foundation
-import SwiftUI
 import SwiftData
+import SwiftUI
+
 @main
 struct AudioSyncApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -22,13 +23,13 @@ struct AudioSyncApp: App {
     @State var similarArtistWindow: NSWindow? = nil
     @Environment(\.openWindow) var openWindow
     @ObservedObject var audioManager = AudioFormatManager.shared
-    init(){
+    init() {
         appDelegate.modelContainer = sharedModelContainer
     }
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Song.self
-            
+
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,
@@ -43,13 +44,15 @@ struct AudioSyncApp: App {
             fatalError("Could not create ModelContainer: \(error)")
         }
     }()
-    
-    
+
     private func CreateKaraoke() {
-        if isKaraokeVisible && !isFullScreenVisible && viewModel.isCurrentTrackPlaying{
+        if isKaraokeVisible && !isFullScreenVisible
+            && viewModel.isViewLyricsShow
+        {
             if karaoKeWindow == nil {
                 let contentView = NSHostingView(
-                    rootView: KaraokeView().environmentObject(viewModel))
+                    rootView: KaraokeView().environmentObject(viewModel)
+                )
                 karaoKeWindow = NSWindow(
                     contentRect: NSRect(x: 0, y: 100, width: 800, height: 100),
                     styleMask: [.borderless],
@@ -68,8 +71,11 @@ struct AudioSyncApp: App {
                     let windowX = (screenFrame.width - 800) / 2
                     karaoKeWindow?.setFrame(
                         NSRect(
-                            x: windowX, y: windowY, width: 800,
-                            height: windowHeight),
+                            x: windowX,
+                            y: windowY,
+                            width: 800,
+                            height: windowHeight
+                        ),
                         display: false
                     )
                 }
@@ -91,18 +97,18 @@ struct AudioSyncApp: App {
 
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 250, height: 400),
-                styleMask: [.titled,.closable],
+                styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
             )
-           // window.title = "相似歌手"
+            // window.title = "相似歌手"
             window.center()
             window.contentView = contentView
-            window.level = .floating         // 🔹关键：浮动在其他应用前
-            window.isMovableByWindowBackground = true
+            window.level = .floating  // 🔹关键：浮动在其他应用前
+            //window.isMovableByWindowBackground = true
             window.isReleasedWhenClosed = false
             window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true) // 保证出现在最前
+            NSApp.activate(ignoringOtherApps: true)  // 保证出现在最前
 
             similarArtistWindow = window
         } else {
@@ -115,7 +121,8 @@ struct AudioSyncApp: App {
             if selectorWindow == nil {
                 let contentView = NSHostingView(
                     rootView: LyricsSelectorView().environmentObject(
-                        viewModel)
+                        viewModel
+                    )
                 )
                 selectorWindow = NSWindow(
                     contentRect: NSRect(x: 0, y: 450, width: 450, height: 450),
@@ -134,9 +141,13 @@ struct AudioSyncApp: App {
                     let windowX = (screenFrame.width - 450) / 2
                     selectorWindow?.setFrame(
                         NSRect(
-                            x: windowX, y: windowY, width: 450,
+                            x: windowX,
+                            y: windowY,
+                            width: 450,
                             height: windowHeight
-                        ), display: false)
+                        ),
+                        display: false
+                    )
                 }
                 selectorWindow?.isMovableByWindowBackground = true
             }
@@ -152,27 +163,32 @@ struct AudioSyncApp: App {
     var body: some Scene {
         MenuBarExtra(
             content: {
-                Toggle(String(format: "%d Bit  %.1f kHz",
-                              audioManager.bitDepth ?? 0,
-                              Double(audioManager.sampleRate ?? 0) / 1000.0), isOn: .constant(false))
+                Toggle(
+                    String(
+                        format: "%d Bit  %.1f kHz",
+                        audioManager.bitDepth ?? 0,
+                        Double(audioManager.sampleRate ?? 0) / 1000.0
+                    ),
+                    isOn: .constant(false)
+                )
                 Divider()
                 Toggle("显示歌词", isOn: $isKaraokeVisible)
                     .keyboardShortcut("s")
                 Divider()
                 Toggle("全屏歌词", isOn: $isFullScreenVisible)
                     .keyboardShortcut("f")
-                
+
                 Divider()
-                Button("相似歌手"){
+                Button("相似歌手") {
                     showSimilarArtistWindow()
                 }
-                
+
                 Divider()
                 Button("删除本地缓存", action: appDelegate.delCurrentSongObject)
                     .keyboardShortcut("d")
                 Divider()
                 Button("剪贴板读取原始歌曲名", action: appDelegate.manualNamefetch)
-                
+
                 Divider()
                 Button("退出") {
                     NSApplication.shared.terminate(nil)
@@ -196,8 +212,11 @@ struct AudioSyncApp: App {
         .onChange(
             of: isFullScreenVisible,
             {
-                Log.ui.info("isFullScreenVisible change: \(isFullScreenVisible)")
-                viewModel.isViewLyricsShow = isKaraokeVisible || isFullScreenVisible
+                Log.ui.info(
+                    "isFullScreenVisible change: \(isFullScreenVisible)"
+                )
+                viewModel.isViewLyricsShow =
+                    isKaraokeVisible || isFullScreenVisible
                 if isFullScreenVisible {
                     openWindow(id: "fullScreen")
                     NSApplication.shared.activate()
@@ -210,45 +229,55 @@ struct AudioSyncApp: App {
             of: isKaraokeVisible,
             {
                 Log.ui.info("isKaraokeVisible change: \(isKaraokeVisible)")
-                viewModel.isViewLyricsShow = isKaraokeVisible || isFullScreenVisible
+                viewModel.isViewLyricsShow =
+                    isKaraokeVisible || isFullScreenVisible
                 CreateKaraoke()
-            })
-        .onChange(of: viewModel.isCurrentTrackPlaying, {
-            CreateKaraoke()
-        })
+            }
+        )
+        .onChange(
+            of: viewModel.isLyricsPlaying,
+            {
+                CreateKaraoke()
+            }
+        )
         WindowGroup("fullScreenLyrics", id: "fullScreen") {
-            FullScreenView(isPresented: $isFullScreenVisible).environmentObject(viewModel)
-                .onWindowDidAppear { window in
-                    window.collectionBehavior = .fullScreenPrimary
+            FullScreenView(isPresented: $isFullScreenVisible).environmentObject(
+                viewModel
+            )
+            .onWindowDidAppear { window in
+                window.collectionBehavior = .fullScreenPrimary
 
-                    // 阻止 ESC
-                    NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
-                        event in
-                        if event.keyCode == 53 { return nil }  // Esc
-                        return event
-                    }
-
-                    // 设置退出全屏时关闭窗口
-                    let delegate = FullScreenWindowDelegate()
-                    delegate.onExitFullScreen = {
-                        isFullScreenVisible = false
-                        window.close()
-                    }
-                    window.delegate = delegate
-
-                    // 将 delegate 附着到 window 上，避免释放
-                    objc_setAssociatedObject(
-                        window, "FullScreenDelegateKey", delegate,
-                        .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-
-                    // 切换到全屏
-                    if !window.styleMask.contains(.fullScreen) {
-                        window.toggleFullScreen(nil)
-                    }
+                // 阻止 ESC
+                NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
+                    event in
+                    if event.keyCode == 53 { return nil }  // Esc
+                    return event
                 }
-                .onDisappear {
+
+                // 设置退出全屏时关闭窗口
+                let delegate = FullScreenWindowDelegate()
+                delegate.onExitFullScreen = {
                     isFullScreenVisible = false
+                    window.close()
                 }
+                window.delegate = delegate
+
+                // 将 delegate 附着到 window 上，避免释放
+                objc_setAssociatedObject(
+                    window,
+                    "FullScreenDelegateKey",
+                    delegate,
+                    .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+                )
+
+                // 切换到全屏
+                if !window.styleMask.contains(.fullScreen) {
+                    window.toggleFullScreen(nil)
+                }
+            }
+            .onDisappear {
+                isFullScreenVisible = false
+            }
         }
     }
 }

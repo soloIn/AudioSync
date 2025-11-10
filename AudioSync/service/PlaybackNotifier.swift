@@ -17,8 +17,8 @@ struct TrackInfo: Encodable, Equatable {
         case name, artist, albumArtist, trackID, album, state, genre
     }
     static func == (lhs: TrackInfo, rhs: TrackInfo) -> Bool {
-            return lhs.trackID == rhs.trackID
-        }
+        return lhs.trackID == rhs.trackID
+    }
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(name, forKey: .name)
@@ -35,19 +35,20 @@ enum PlayState: String, Encodable {
     case stop
 }
 enum PlaybackTrigger {
-    case notification
-    case script
+    case formatSwitch
+    case lyrics
 }
+@MainActor
 class PlaybackNotifier {
     var onPlay: ((TrackInfo?, PlaybackTrigger) async -> Void)?
 
     private lazy var appleMusicScript: MusicApplication? = SBApplication(
         bundleIdentifier: "com.apple.Music"
     )
-    private var audioManager = AudioFormatManager.shared
-    
-    
-    init() {
+    var viewModel: ViewModel
+
+    init(viewModel: ViewModel) {
+        self.viewModel = viewModel
         DistributedNotificationCenter.default().addObserver(
             self,
             selector: #selector(receivedPlaybackNotification(_:)),
@@ -71,111 +72,80 @@ class PlaybackNotifier {
             )
             return
         }
-
+        viewModel.isCurrentTrackPlaying = (state == "Playing")
         Log.backend.info("appleNotification userInfo: \(userInfo)")
-        let album = userInfo["Album"] as? String
-        
-        Task { @MainActor in
-            if state == "Playing" && audioManager.lastAlbum != album
-            {
-                audioManager.lastAlbum = album
-                //audioManager.isSameAlbum.updateValue(true, forKey: albumKey)
+        let nextAlbum = userInfo["Album"] as? String ?? ""
+
+        if state == "Playing" && viewModel.currentAlbum != nextAlbum {
+            Task {
+                viewModel.currentAlbum = nextAlbum
                 guard let script = self.appleMusicScript else { return }
                 script.pause?()
-                Log.backend.info("pause...")
-                if let onPlay = onPlay {
-                    await onPlay(nil, .notification)  // 等待执行完
+                Log.backend.debug("pause...")
+                if let onPlay = self.onPlay {
+                    await onPlay(nil, .formatSwitch)  // 等待执行完
                 }
-                Log.backend.info("play...")
+                Log.backend.debug("play...")
                 script.setPlayerPosition?(0.0)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {[weak self] in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     script.playpause?()
-                    self?.scriptNotification()
                 }
-                
+
             }
         }
-    }
-
-    func scriptNotification() {
-        guard let track = fetchCurrentTrack() else {
-            return
+        if state != "Playing" {
+            viewModel.isLyricsPlaying = false
         }
+        let nextName = userInfo["Name"] as? String ?? ""
+        let nextArtist = userInfo["Artist"] as? String ?? ""
+        let songKey = "\(nextName)-\(nextArtist)-\(nextAlbum)"
+        if songKey != viewModel.currentSong {
+            viewModel.currentSong = songKey
+            let genre = userInfo["Genre"] as? String ?? ""
+            Task {
+                let trackID = try await IDFetcher.fetchTrackID(
+                    name: nextName,
+                    artist: nextArtist
+                )
+                let albumData = try await IDFetcher.fetchArtworkData(
+                    name: nextName,
+                    artist: nextArtist
+                )
 
-        Log.backend.info("scriptNotification track: \(JSON.stringify(track))")
-        Task {
-            if let onPlay = onPlay {
-                await onPlay(track, .script)  // 等待执行完
+                let trackInfo = TrackInfo(
+                    name: nextName,
+                    artist: nextArtist,
+                    albumArtist: nextAlbum,
+                    trackID: String(trackID),
+                    album: nextAlbum,
+                    state: stringFromPlayerState(state),
+                    genre: genre,
+                    color: albumData.findDominantColors(),
+                    albumCover: albumData
+                )
+                viewModel.currentTrack = trackInfo
+                if let onPlay = self.onPlay {
+                    await onPlay(nil, .lyrics)
+                }
+            }
+
+        } else {
+            Log.backend.debug("跳过重复通知: \(nextName) - \(nextArtist)")
+            Task {
+                if let onPlay = self.onPlay {
+                    await onPlay(nil, .lyrics)
+                }
             }
         }
+
     }
-    func stringFromPlayerState(_ state: MusicEPlS) -> PlayState {
+
+    func stringFromPlayerState(_ state: String) -> PlayState {
         switch state {
-        case .playing: return .playing
-        case .stopped: return .stop
+        case "Playing": return .playing
+        case "Paused": return .stop
         default: return .stop
         }
-    }
-    func fetchCurrentTrack() -> TrackInfo? {
-        guard let script = appleMusicScript else {
-            Log.backend.error("appleMusicScript: 脚本对象不存在")
-            return nil
-        }
-        
-        let trackInfo = script.currentTrack
-        let persistentID = trackInfo?.persistentID
-        let state = script.playerState
-        let artworkData = (trackInfo?.artworks?().firstObject as? MusicArtwork)?
-            .data
-
-        // 统一检查必填字段
-        let required: [(String, Any?)] = [
-            ("currentTrack", trackInfo),
-            ("persistentID", persistentID),
-            ("playerState", state),
-            ("artworkData", artworkData),
-        ]
-
-        if let missing = required.first(where: { $0.1 == nil }) {
-            Log.backend.error("appleMusicScript: 缺少 \(missing.0) \n  trackInfo: \(dump(trackInfo))")
-            return nil
-        }
-
-        let track = TrackInfo(
-            name: trackInfo?.name ?? "",
-            artist: trackInfo?.artist ?? "",
-            albumArtist: trackInfo?.albumArtist ?? "",
-            trackID: persistentID!,
-            album: trackInfo?.album ?? "",
-            state: stringFromPlayerState(state!),
-            genre: trackInfo?.genre ?? "",
-            color: artworkData?.findDominantColors(),
-            albumCover: artworkData
-        )
-        return track
-    }
-
-    func fetchCurrentTrackWithRetry(
-        maxRetryCount: Int = 3,
-        delaySeconds: Double = 0.5
-    ) async -> TrackInfo? {
-        for attempt in 1...maxRetryCount {
-            if let track = fetchCurrentTrack() {
-                return track
-            } else {
-                if attempt < maxRetryCount {
-                    Log.backend.error(
-                        "第 \(attempt) 次尝试失败，\(delaySeconds) 秒后重试..."
-                    )
-                    try? await Task.sleep(
-                        nanoseconds: UInt64(delaySeconds * 1_000_000_000)
-                    )
-                } else {
-                    Log.backend.error("达到最大重试次数，放弃。")
-                }
-            }
-        }
-        return nil
     }
 }
 extension Dictionary where Key == AnyHashable, Value == Any {

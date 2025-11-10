@@ -15,7 +15,8 @@ struct KaraokeView: View {
             Text(
                 verbatim: viewmodel.currentlyPlayingLyrics[
                     currentlyPlayingLyricsIndex
-                ].words)
+                ].words
+            )
             if let trlycs = viewmodel.currentlyPlayingLyrics[
                 currentlyPlayingLyricsIndex
             ].attachments[.translation()]?.stringValue, !trlycs.isEmpty {
@@ -23,17 +24,22 @@ struct KaraokeView: View {
                     .font(
                         .custom(
                             viewmodel.karaokeFont.fontName,
-                            size: 0.9 * (viewmodel.karaokeFont.pointSize))
+                            size: 0.9 * (viewmodel.karaokeFont.pointSize)
+                        )
                     )
-//                    .opacity(0.85)
+                //                    .opacity(0.85)
             }
         }
     }
 
     @ViewBuilder func lyricsView() -> some View {
         if let currentlyPlayingLyricsIndex = viewmodel
-            .currentlyPlayingLyricsIndex, viewmodel.currentlyPlayingLyrics.indices.contains(currentlyPlayingLyricsIndex),
-           !viewmodel.currentlyPlayingLyrics[currentlyPlayingLyricsIndex].words.isEmpty
+            .currentlyPlayingLyricsIndex,
+            viewmodel.currentlyPlayingLyrics.indices.contains(
+                currentlyPlayingLyricsIndex
+            ),
+            !viewmodel.currentlyPlayingLyrics[currentlyPlayingLyricsIndex].words
+                .isEmpty
         {
             multilingualView(currentlyPlayingLyricsIndex)
         } else {
@@ -48,29 +54,38 @@ struct KaraokeView: View {
             .font(
                 .custom(
                     viewmodel.karaokeFont.fontName,
-                    size: viewmodel.karaokeFont.pointSize)
+                    size: viewmodel.karaokeFont.pointSize
+                )
             )
             .padding(10)
             .padding(.horizontal, 10)
             .background {
                 VisualEffectView().ignoresSafeArea()
-                if !viewmodel.currentAlbumColor.isEmpty {
-                    ZStack {
-                        LinearGradient(
-                            gradient: Gradient(
-                                colors: viewmodel.currentAlbumColor),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                        Color.black.opacity(0.1)
+                if let colors = viewmodel.currentTrack?.color {
+                    if !colors.isEmpty {
+                        ZStack {
+                            LinearGradient(
+                                gradient: Gradient(
+                                    colors: colors
+                                ),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            Color.black.opacity(0.1)
+                        }
                     }
                 }
+
             }
             .cornerRadius(16)
             .multilineTextAlignment(.center)
             .frame(
-                minWidth: 800, maxWidth: 800, minHeight: 100, maxHeight: 100,
-                alignment: .center)
+                minWidth: 800,
+                maxWidth: 800,
+                minHeight: 100,
+                maxHeight: 100,
+                alignment: .center
+            )
 
     }
 }

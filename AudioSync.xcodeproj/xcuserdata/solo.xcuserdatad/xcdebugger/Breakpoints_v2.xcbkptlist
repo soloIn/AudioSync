@@ -14,9 +14,9 @@
             filePath = "AudioSync/utils/NetworkUtil.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "563"
-            endingLineNumber = "563"
-            landmarkName = "fetchSimilarArtists(name:)"
+            startingLineNumber = "570"
+            endingLineNumber = "570"
+            landmarkName = "fetchLyricsByID(song:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

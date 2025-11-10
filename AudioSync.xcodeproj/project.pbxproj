@@ -31,6 +31,7 @@
 		F85F5BE72E82694D00EFD18F /* PlaybackNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BCF2E82694D00EFD18F /* PlaybackNotifier.swift */; };
 		F85F5BE82E82694D00EFD18F /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BD02E82694D00EFD18F /* Utils.swift */; };
 		F86657082DDC252100E55B82 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = F86657072DDC251800E55B82 /* README.md */; };
+		F86B79062EC18C9600CC9DDB /* Key.swift in Sources */ = {isa = PBXBuildFile; fileRef = F86B79052EC18C8200CC9DDB /* Key.swift */; };
 		F8D979A62EBC757400BDD992 /* SimilarArtistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D979A52EBC757400BDD992 /* SimilarArtistView.swift */; };
 		F8E18C7F2EBB0EF700EA75DC /* Artist.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E18C7E2EBB0EF200EA75DC /* Artist.swift */; };
 		F8F61C9D2DC0999C007B028F /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8F61C9C2DC0999C007B028F /* AppKit.framework */; };
@@ -64,6 +65,7 @@
 		F85F5BCF2E82694D00EFD18F /* PlaybackNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackNotifier.swift; sourceTree = "<group>"; };
 		F85F5BD02E82694D00EFD18F /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
 		F86657072DDC251800E55B82 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		F86B79052EC18C8200CC9DDB /* Key.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Key.swift; sourceTree = "<group>"; };
 		F8D979A52EBC757400BDD992 /* SimilarArtistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimilarArtistView.swift; sourceTree = "<group>"; };
 		F8E18C7E2EBB0EF200EA75DC /* Artist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artist.swift; sourceTree = "<group>"; };
 		F8F61C892DC097BD007B028F /* AudioSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AudioSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -100,6 +102,7 @@
 		F85F5BBE2E82694D00EFD18F /* model */ = {
 			isa = PBXGroup;
 			children = (
+				F86B79052EC18C8200CC9DDB /* Key.swift */,
 				F8E18C7E2EBB0EF200EA75DC /* Artist.swift */,
 				F85F5BBB2E82694D00EFD18F /* LyricStruct.swift */,
 				F85F5BBC2E82694D00EFD18F /* Song.swift */,
@@ -119,7 +122,7 @@
 		F85F5BD12E82694D00EFD18F /* AudioSync */ = {
 			isa = PBXGroup;
 			children = (
-				F807B2F42EB9B94A0093F91B /* IDFetcher.swift */,
+				F86B79082EC18CD200CC9DDB /* AppleMusic */,
 				F85F5BBA2E82694D00EFD18F /* LyricsParser */,
 				F85F5BBE2E82694D00EFD18F /* model */,
 				F85F5BC02E82694D00EFD18F /* Preview Content */,
@@ -130,7 +133,6 @@
 				F85F5BEA2E82699D00EFD18F /* view */,
 				F85F5BC92E82694D00EFD18F /* Info.plist */,
 				F85F5BE92E82696A00EFD18F /* utils */,
-				F807B2F22EB9B2AF0093F91B /* MusicNavigator.swift */,
 			);
 			path = AudioSync;
 			sourceTree = "<group>";
@@ -166,6 +168,15 @@
 				F85F5BCF2E82694D00EFD18F /* PlaybackNotifier.swift */,
 			);
 			path = service;
+			sourceTree = "<group>";
+		};
+		F86B79082EC18CD200CC9DDB /* AppleMusic */ = {
+			isa = PBXGroup;
+			children = (
+				F807B2F42EB9B94A0093F91B /* IDFetcher.swift */,
+				F807B2F22EB9B2AF0093F91B /* MusicNavigator.swift */,
+			);
+			path = AppleMusic;
 			sourceTree = "<group>";
 		};
 		F8F61C802DC097BD007B028F = {
@@ -292,6 +303,7 @@
 				F85F5BE22E82694D00EFD18F /* KaraokeView.swift in Sources */,
 				F85F5BE32E82694D00EFD18F /* Log.swift in Sources */,
 				F807B2F52EB9B94C0093F91B /* IDFetcher.swift in Sources */,
+				F86B79062EC18C9600CC9DDB /* Key.swift in Sources */,
 				F85F5BE52E82694D00EFD18F /* LyricsSelectorView.swift in Sources */,
 				F85F5BE62E82694D00EFD18F /* NetworkUtil.swift in Sources */,
 				F85F5BE72E82694D00EFD18F /* PlaybackNotifier.swift in Sources */,
