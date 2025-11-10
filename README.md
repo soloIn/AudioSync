@@ -7,7 +7,7 @@
 - 🎵 **多源歌词获取**：集成网易云、QQ 音乐等平台，自动匹配并抓取歌词
   
 <img width="787" height="403" alt="image" src="https://github.com/user-attachments/assets/f8b36b48-f83a-4d41-85dc-c80e353abc33" />
-<video><source src="https://github.com/user-attachments/assets/d56a036d-0254-46c3-afe7-cd54fb50ad27"></source> </video> 
+<video><source src="https://github.com/user-attachments/assets/d56a036d-0254-46c3-afe7-cd54fb50ad27" type="video/mp4"> </video> 
 
 - 🧠 **日文歌曲智能还原**：处理片假名/罗马音等 J-Pop 曲名，还原正确的原文 (需要调用大模型api，参见fetchOriginalName)
   <img width="862" alt="image" src="https://github.com/user-attachments/assets/3951a77f-f043-4625-89de-bb591b19fd4b" />
