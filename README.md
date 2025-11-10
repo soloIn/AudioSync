@@ -20,7 +20,8 @@
 - 🔍 **候选歌词选择策略**：自动匹配严格，如匹配度不高，会弹窗手动选择，选择最合适歌词
   <img width="460" height="489" alt="image" src="https://github.com/user-attachments/assets/10cdcf1c-52df-4d71-81c9-f77189887482" />
 
-- **相似歌手**，来源last.fm
+- **相似歌手**：来源last.fm
+
   <img width="362" height="544" alt="image" src="https://github.com/user-attachments/assets/4e791038-5ae1-4016-a1c2-1665996aed05" />
 
 
