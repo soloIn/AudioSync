@@ -90,7 +90,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             }
-
+            
+            viewModel.$refreshSimilarArtist
+                .removeDuplicates()
+                .sink{ [weak self] refreshSimilarArtist in
+                    guard let self = self else { return }
+                    if refreshSimilarArtist {
+                        networkUtil?.fetchSimilarArtistsAndCovers()
+                        viewModel.refreshSimilarArtist = false
+                    }
+                    
+                }
+                .store(in: &cancellables)
+            
             viewModel.$isViewLyricsShow
                 .removeDuplicates()
                 .sink { [weak self] isShowLyrics in
@@ -105,14 +117,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     } else {
                         viewModel.stopLyricUpdater()
                     }
-                }
-                .store(in: &cancellables)
-
-            viewModel.$currentTrack
-                .removeDuplicates()
-                .sink { [weak self] currentTrack in
-                    guard let self = self else { return }
-                    networkUtil?.fetchSimilarArtistsAndCovers()
                 }
                 .store(in: &cancellables)
 
@@ -245,6 +249,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func fetchSimilarArtist() {
+        networkUtil?.fetchSimilarArtistsAndCovers()
+    }
     @objc func manualNamefetch() {
         Task {
             await manulNameAsyncFetch()

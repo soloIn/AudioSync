@@ -29,6 +29,7 @@ class ViewModel: ObservableObject {
     @Published var similarArtists: [Artist] = []
     @Published var currentAlbum: String?
     @Published var currentSong: String?
+    @Published var refreshSimilarArtist: Bool = false
     var onCandidateSelected: ((CandidateSong) -> Void)?  // ❗️等待用的回调
 
     lazy var appleMusicScript: MusicApplication? = SBApplication(

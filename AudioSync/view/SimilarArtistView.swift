@@ -10,6 +10,42 @@ import SwiftUI
 struct SimilarArtistView: View {
     @EnvironmentObject var viewmodel: ViewModel
     var body: some View {
+        if let artist = viewmodel.currentTrack?.artist {
+            HStack(spacing: 8){
+                Spacer()
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack {
+                        Text("\(artist)")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(Color(NSColor.secondaryLabelColor))
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                    .frame(minWidth: 120)
+                }
+                .frame(width: 120)
+                Text(" 相似歌手")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(
+                        Color(NSColor.secondaryLabelColor)
+                    )
+                    .frame(width: 70)
+                Button(action: {
+                    withAnimation {
+                        viewmodel.refreshSimilarArtist = true
+                    }
+                }) {
+                    Image(systemName: "arrow.clockwise.circle")
+                        .font(.system(size: 18)) // 放大按钮图标
+                        .foregroundColor(.secondary) // 与整体配色一致
+                        .background(Color.clear) // 背景透明
+                        .contentShape(Circle()) // 扩大点击范围但保持透明
+                }
+                .buttonStyle(PlainButtonStyle())
+                Spacer()
+            }
+            .padding(5)
+            .frame(width: 250)
+        }
         ScrollView {
             LazyVStack(spacing: 12) {
                 ForEach(viewmodel.similarArtists) { artist in
@@ -72,7 +108,7 @@ struct SimilarArtistView: View {
         .cornerRadius(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.controlBackgroundColor))  // 整体背景色
-        .padding(.vertical, 16)
+        //.padding(.vertical, 16)
     }
     private func openMusic(artist: String) {
         Task {
@@ -89,5 +125,27 @@ struct SimilarArtistView: View {
 }
 
 #Preview {
+    let previewViewModel: ViewModel = {
+        let vm = ViewModel()
+        vm.currentTrack = TrackInfo(
+            name: "nextName",
+            artist: "nextArtist",
+            albumArtist: "nextAlbum",
+            trackID: "trackID",
+            album: "nextAlbum",
+            state: .playing,
+            genre: "genre",
+            color: [],
+            albumCover: nil
+        )
+        vm.similarArtists = [
+            Artist(name: "Artist A", url: ""),
+            Artist(name: "Artist B", url: ""),
+            Artist( name: "Artist C", url: "")
+        ]
+        return vm
+    }()
+
     SimilarArtistView()
+        .environmentObject(previewViewModel)
 }

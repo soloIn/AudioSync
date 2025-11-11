@@ -89,6 +89,7 @@ struct AudioSyncApp: App {
     }
 
     private func showSimilarArtistWindow() {
+        appDelegate.fetchSimilarArtist()
         if similarArtistWindow == nil {
             let contentView = NSHostingView(
                 rootView: SimilarArtistView()
