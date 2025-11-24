@@ -30,6 +30,7 @@ class ViewModel: ObservableObject {
     @Published var currentAlbum: String?
     @Published var currentSong: String?
     @Published var refreshSimilarArtist: Bool = false
+    @Published var enableAudioSync: Bool = true
     var onCandidateSelected: ((CandidateSong) -> Void)?  // ❗️等待用的回调
 
     lazy var appleMusicScript: MusicApplication? = SBApplication(

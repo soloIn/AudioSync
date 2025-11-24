@@ -49,45 +49,9 @@ public enum IDFetchError: Error, LocalizedError {
         }
     }
 }
-actor SongCache {
-    private var cache: [String: SongSearchResult.Song] = [:]
-    private var ongoingTasks: [String: Task<SongSearchResult.Song, Error>] = [:]
-    private var keysOrder: [String] = []
-    private let maxSize: Int
-    init(maxSize: Int = 100) {
-        self.maxSize = maxSize
-    }
-    func get(for key: String) -> SongSearchResult.Song? {
-        return cache[key]
-    }
-
-    func set(_ song: SongSearchResult.Song, for key: String) {
-        if cache[key] == nil {
-            keysOrder.append(key)
-        }
-        cache[key] = song
-        ongoingTasks[key] = nil
-        enforceLimit()
-    }
-    private func enforceLimit() {
-        while keysOrder.count > maxSize {
-            let oldestKey = keysOrder.removeFirst()
-            cache[oldestKey] = nil
-        }
-    }
-    func task(for key: String) -> Task<SongSearchResult.Song, Error>? {
-        return ongoingTasks[key]
-    }
-
-    func setTask(_ task: Task<SongSearchResult.Song, Error>, for key: String) {
-        ongoingTasks[key] = task
-    }
-    func removeTask(for key: String) {
-        ongoingTasks[key] = nil
-    }
-}  // MARK: - 3. ID 获取器
+// MARK: - 3. ID 获取器
 public enum IDFetcher {
-    private static let songCacheActor = SongCache()
+    private static let itunesSongCacheActor = ItunesSongCache()
     private static func safeCacheKey(
         for name: String,
         artist: String,
@@ -132,12 +96,20 @@ public enum IDFetcher {
         // 2. 下载图片数据
         let (data, _) = try await URLSession.shared.data(from: url)
 
-        // 3. 创建 NSImage
-        guard let image = NSImage(data: data) else {
-            throw IDFetchError.dataParsingError
-        }
-
-        return image
+        // ✅ 优化点：不要直接返回原始大图
+            guard let originalImage = NSImage(data: data) else {
+                throw IDFetchError.dataParsingError
+            }
+            
+            // 定义一个合适的最大尺寸，例如 600px
+            let targetSize = NSSize(width: 200, height: 200)
+            
+            // 如果原图比目标尺寸小，直接返回；否则进行缩放
+            if originalImage.size.width <= targetSize.width {
+                return originalImage
+            } else {
+                return originalImage.resized(to: targetSize) ?? originalImage
+            }
     }
     private static func fetchSong(
         by name: String,
@@ -151,18 +123,18 @@ public enum IDFetcher {
             countryCode: countryCode
         )
         // 1. 先检查缓存
-        if let cachedSong = await songCacheActor.get(for: cacheKey) {
+        if let cachedSong = await itunesSongCacheActor.get(for: cacheKey) {
             Log.backend.debug("命中缓存:\(name) - \(artist)")
             return cachedSong
         }
 
         // 2. 再检查是否有正在进行的任务
-        if let ongoingTask = await songCacheActor.task(for: cacheKey) {
+        if let ongoingTask = await itunesSongCacheActor.task(for: cacheKey) {
             return try await ongoingTask.value
         }
         // 3. 如果没有，就创建一个新任务
         let task = Task<SongSearchResult.Song, Error> {
-            defer { Task { await songCacheActor.removeTask(for: cacheKey) } }
+            defer { Task { await itunesSongCacheActor.removeTask(for: cacheKey) } }
 
             let song = try await fetchSongFromNetwork(
                 name: name,
@@ -170,12 +142,12 @@ public enum IDFetcher {
                 countryCode: countryCode
             )
 
-            await songCacheActor.set(song, for: cacheKey)
+            await itunesSongCacheActor.set(song, for: cacheKey)
             return song
         }
 
         // 4. 保存任务到 actor
-        await songCacheActor.setTask(task, for: cacheKey)
+        await itunesSongCacheActor.setTask(task, for: cacheKey)
 
         // 5. 等待任务完成
         return try await task.value
@@ -251,5 +223,19 @@ public enum IDFetcher {
             }
             throw IDFetchError.dataParsingError
         }
+    }
+}
+extension NSImage {
+    func resized(to newSize: NSSize) -> NSImage? {
+        let newImage = NSImage(size: newSize)
+        newImage.lockFocus()
+        
+        let sourceRect = NSRect(origin: .zero, size: self.size)
+        let destRect = NSRect(origin: .zero, size: newSize)
+        
+        self.draw(in: destRect, from: sourceRect, operation: .copy, fraction: 1.0)
+        
+        newImage.unlockFocus()
+        return newImage
     }
 }

@@ -46,6 +46,8 @@ class PlaybackNotifier {
         bundleIdentifier: "com.apple.Music"
     )
     var viewModel: ViewModel
+    
+    @State var lock: Bool = false
 
     init(viewModel: ViewModel) {
         self.viewModel = viewModel
@@ -70,14 +72,17 @@ class PlaybackNotifier {
             Log.backend.error(
                 "appleNotification:  userInfo is missing required fields."
             )
+            Log.notice.notice("trackInfo is missing", "apple music distributedNotification")
             return
         }
         viewModel.isCurrentTrackPlaying = (state == "Playing")
         Log.backend.info("appleNotification userInfo: \(userInfo)")
         let nextAlbum = userInfo["Album"] as? String ?? ""
 
-        if state == "Playing" && viewModel.currentAlbum != nextAlbum {
+        if !lock && state == "Playing" && !nextAlbum.isEmpty && viewModel.currentAlbum != nextAlbum && viewModel.enableAudioSync{
+            lock = true
             Task {
+                defer { lock = false }
                 viewModel.currentAlbum = nextAlbum
                 guard let script = self.appleMusicScript else { return }
                 script.pause?()

@@ -6,6 +6,10 @@ class AudioFormatManager: ObservableObject {
     @Published var sampleRate: Int?
     @Published var bitDepth: Int?
 
+    private static let logRegex: NSRegularExpression? = {
+        let pattern = #"(\d+) Hz.*?from (\d+)-bit source"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
     var needChange: Bool = true
     var currentFormat: (sampleRate: Int, bitDepth: Int) = (0, 0) {
         didSet {
@@ -102,7 +106,7 @@ class AudioFormatManager: ObservableObject {
                 if let output = String(data: data, encoding: .utf8),
                     !output.isEmpty
                 {
-                    self?.parseLog(output)
+                    self?.parseLogOnBackground(output)
                 }
             } catch {
                 Log.backend.error(
@@ -125,18 +129,23 @@ class AudioFormatManager: ObservableObject {
         self.logPipe = pipe
         logProcess?.standardOutput = pipe
 
+        // 2. ✅ 优化读取处理逻辑
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty else { return }
+            // 使用 autoreleasepool 确保每次读取的临时变量立即释放
+            autoreleasepool {
+                let data = handle.availableData
+                guard !data.isEmpty else { return }
 
-            if let output = String(data: data, encoding: .utf8) {
-                Task { @MainActor in
-                    AudioFormatManager.shared.parseLog(output)
+                guard let output = String(data: data, encoding: .utf8) else {
+                    return
                 }
+
+                // 3. ✅ 在后台线程直接解析，不要派发给 MainActor
+                self?.parseLogOnBackground(output)
             }
         }
 
-        logProcess?.terminationHandler = { [weak self] process in
+        logProcess?.terminationHandler = { process in
             DispatchQueue.main.async {
                 if AudioFormatManager.shared.isMonitoring == true {  // 仅在仍在监控状态时重置
                     AudioFormatManager.shared.isMonitoring = false
@@ -155,36 +164,34 @@ class AudioFormatManager: ObservableObject {
             }
         }
     }
-
-    private func parseLog(_ log: String) {
+    private func parseLogOnBackground(_ log: String) {
         let now = Date().timeIntervalSince1970
-        let pattern = #"(\d+) Hz.*?from (\d+)-bit source"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
-            return
-        }
+        guard let regex = AudioFormatManager.logRegex else { return }
 
         let nsLog = log as NSString
-        Log.backend.debug("Music Format log: \(nsLog)")
+
         regex.enumerateMatches(
             in: log,
             range: NSRange(location: 0, length: nsLog.length)
         ) { match, _, _ in
             guard let match = match, match.numberOfRanges >= 3 else { return }
 
-            let sampleRate = nsLog.substring(with: match.range(at: 1))
-            let bitDepth = nsLog.substring(with: match.range(at: 2))
+            let sampleRateStr = nsLog.substring(with: match.range(at: 1))
+            let bitDepthStr = nsLog.substring(with: match.range(at: 2))
 
-            if let sr = Int(sampleRate), let bd = Int(bitDepth) {
-                // 基于解析结果去重
+            if let sr = Int(sampleRateStr), let bd = Int(bitDepthStr) {
+                // 5. ✅ 解析成功后，再检查是否需要更新，减少主线程负担
                 if self.currentFormat.sampleRate == sr,
                     self.currentFormat.bitDepth == bd,
                     now - self.lastLogTime < 1
                 {
                     return
                 }
+
                 self.lastLogTime = now
 
-                DispatchQueue.main.async {
+                // 只有真正需要更新时，才切回主线程
+                Task { @MainActor in
                     AudioFormatManager.shared.currentFormat = (sr, bd)
                 }
             }
@@ -443,8 +450,11 @@ class AudioFormatManager: ObservableObject {
                 "bitDepth": format.mFormat.mBitsPerChannel,
             ]
         }
-        Log.backend.info(
+        let msg =
             "从\(JSON.stringify(simplifiedFormats))中未找到匹配「\(depth)Bit \(rate)kHz」的输出格式"
+        Log.notice.notice("格式匹配失败", msg)
+        Log.backend.info(
+            msg
         )
         // 次选：匹配采样率，使用更高位深
         if let rateMatch = formats.filter({

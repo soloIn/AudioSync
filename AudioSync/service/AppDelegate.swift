@@ -13,8 +13,11 @@ import Foundation
 import MusicKit
 import SwiftData
 import SwiftUI
+import UserNotifications
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate,
+    UNUserNotificationCenterDelegate
+{
     var statusBarItem: NSStatusItem!
     var audioManager = AudioFormatManager.shared
     var playbackNotifier: PlaybackNotifier?
@@ -27,21 +30,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
 
         NSApp.setActivationPolicy(.accessory)
-        //        registerMetalShaders()
 
+        UNUserNotificationCenter.current().delegate = self
         Task { @MainActor in
             playbackNotifier = PlaybackNotifier(viewModel: self.viewModel)
             networkUtil = NetworkUtil(viewModel: self.viewModel)
 
             self.playbackNotifier?.onPlay = {
                 [weak self] trackInfo, trigger in
-                Log.backend.debug("playbackNotifier.onPlay")
+                Log.backend.debug("playbackNotifier.onPlay \(trigger)")
                 guard let self = self else {
                     return
                 }
                 // 采样率和位深同步
                 if trigger == .formatSwitch {
-                    Log.backend.debug("formatSwitch")
                     await withCheckedContinuation { continuation in
                         var didResume = false
                         Task {
@@ -71,8 +73,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 // 歌词
                 if trigger == .lyrics {
-                    Log.backend.debug("lyrics")
-
                     Task { [weak self] in
                         guard let self else { return }
 
@@ -90,19 +90,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             }
-            
+
             viewModel.$refreshSimilarArtist
                 .removeDuplicates()
-                .sink{ [weak self] refreshSimilarArtist in
+                .sink { [weak self] refreshSimilarArtist in
                     guard let self = self else { return }
                     if refreshSimilarArtist {
                         networkUtil?.fetchSimilarArtistsAndCovers()
                         viewModel.refreshSimilarArtist = false
                     }
-                    
+
                 }
                 .store(in: &cancellables)
-            
+
             viewModel.$isViewLyricsShow
                 .removeDuplicates()
                 .sink { [weak self] isShowLyrics in
@@ -137,6 +137,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         Task {
             let _ = await MusicKit.MusicAuthorization.request()
+
+            do {
+                try await UNUserNotificationCenter.current()
+                    .requestAuthorization(options: [.alert, .sound, .badge])
+            } catch {
+                Log.backend.error("用户拒绝了通知权限")
+            }
             // 出发启动时歌词显示
             if let onPlay = self.playbackNotifier?.onPlay {
                 await onPlay(nil, .lyrics)
@@ -169,13 +176,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func loadLyricsFromNetwork() async {
+        guard let trackInfo = viewModel.currentTrack else {
+            return
+        }
+        let trackName = trackInfo.name
+        let artist = trackInfo.artist
+        let queueKey = "\(trackName)-\(artist)"
+
         do {
-            guard let trackInfo = viewModel.currentTrack else {
-                return
-            }
-            let trackName = trackInfo.name
-            let artist = trackInfo.artist
-            let queueKey = "\(trackName)-\(artist)"
             if await networkQueue.contains(queueKey) {
                 return
             }
@@ -214,6 +222,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         } catch {
             Log.general.error("网络歌词获取失败: \(error)")
+            Log.notice.notice(
+                "网络歌词获取失败",
+                error.localizedDescription
+            )
+            await networkQueue.remove(queueKey)
         }
     }
 
@@ -249,9 +262,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func fetchSimilarArtist() {
-        networkUtil?.fetchSimilarArtistsAndCovers()
-    }
     @objc func manualNamefetch() {
         Task {
             await manulNameAsyncFetch()
@@ -260,9 +270,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func manulNameAsyncFetch() async {
         do {
-            guard let manualName = NSPasteboard.general.string(forType: .string)
+            guard
+                let manualName = NSPasteboard.general.string(forType: .string),
+                !manualName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .isEmpty
             else {
                 Log.general.warning("⚠️ 粘贴板中没有字符串内容")
+                Log.notice.notice(
+                    "空歌曲名",
+                    "⚠️ 粘贴板中没有字符串内容"
+                )
                 return
             }
             Log.general.debug("来自粘贴板的歌曲: \(manualName)")
@@ -319,5 +336,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 extension OSStatus {
     func toHexString() -> String {
         return String(format: "0x%08X", self)
+    }
+}
+// 3. ✅ 实现代理方法，允许前台通知
+extension AppDelegate {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler:
+            @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // 告诉系统：即使应用在前台，也要显示 Banner 和声音
+        // 注意：macOS 11.0+ 使用 .banner，旧版本可能使用 .alert
+        if #available(macOS 11.0, *) {
+            completionHandler([.banner, .sound])
+        } else {
+            completionHandler([.alert, .sound])
+        }
     }
 }

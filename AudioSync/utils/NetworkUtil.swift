@@ -33,7 +33,9 @@ public class NetworkUtil {
                 artist: artist,
                 album: album
             )
+            let msg = "日文原名: \(JSON.stringify(originalNameResult))"
             Log.general.info("日文原名: \(JSON.stringify(originalNameResult))")
+            Log.notice.notice("获取日文原名成功", msg)
             if !originalNameResult.trackName.isEmpty {
                 effectiveTrackName = originalNameResult.trackName
             }
@@ -71,6 +73,17 @@ public class NetworkUtil {
 
         // 检查是否有候选歌曲，并触发手动选择流程
         // 在 MainActor 上更新 UI 相关状态
+        await MainActor.run {
+            var seen = Set<String>()
+            viewModel.allCandidates.removeAll { candidate in
+                if seen.contains(candidate.id) {
+                    return true // 移除重复
+                } else {
+                    seen.insert(candidate.id)
+                    return false
+                }
+            }
+        }
         let shouldAskForManualSelection = await MainActor.run { () -> Bool in
             if !self.viewModel.allCandidates.isEmpty {
                 self.viewModel.needNanualSelection = true
@@ -82,7 +95,7 @@ public class NetworkUtil {
         if shouldAskForManualSelection {
             Log.general.info("等待用户手动选择...")
             // 为 continuation 添加超时机制
-            let continuationTimeout: TimeInterval = 10.0  // 例如 10 秒超时
+            let continuationTimeout: TimeInterval = 20.0  // 例如 10 秒超时
 
             do {
                 let selectedSong: CandidateSong =
@@ -96,6 +109,7 @@ public class NetworkUtil {
                             await MainActor.run {
                                 if self.viewModel.onCandidateSelected != nil {
                                     Log.general.warning("⚠️ 选择超时")
+                                    Log.notice.notice("⚠️ 选择超时", "")
                                     self.viewModel.onCandidateSelected = nil
                                     self.viewModel.needNanualSelection = false
                                     continuation.resume(
@@ -118,12 +132,14 @@ public class NetworkUtil {
             } catch FetchError.manualSelectionTimeout {
                 await MainActor.run {
                     self.viewModel.needNanualSelection = false  // 确保UI状态被重置
+                    self.viewModel.isLyricsPlaying = false
                 }
                 return []  // 或抛出错误
             } catch {
                 Log.general.error("手动选择发生错误: \(error)")
                 await MainActor.run {
                     self.viewModel.needNanualSelection = false  // 确保UI状态被重置
+                    self.viewModel.isLyricsPlaying = false
                 }
                 throw error  // 重新抛出其他错误
             }
@@ -705,47 +721,5 @@ extension String {
             .replacingOccurrences(of: "（", with: "-")
             .replacingOccurrences(of: "）", with: "-")
             .lowercased()
-    }
-}
-actor CoverCache {
-    private var cache: [String: String] = [:]
-    private var keysOrder: [String] = []
-    private let maxSize: Int
-    init(maxSize: Int = 100) {
-        self.maxSize = maxSize
-    }
-    func get(for key: String) -> String? {
-        return cache[key]
-    }
-
-    func set(_ url: String, for key: String) {
-        if cache[key] == nil {
-            keysOrder.append(key)
-        }
-        cache[key] = url
-        enforceLimit()
-    }
-    private func enforceLimit() {
-        while keysOrder.count > maxSize {
-            let oldestKey = keysOrder.removeFirst()
-            cache[oldestKey] = nil
-        }
-    }
-
-}
-actor NetWorkQueue {
-    private var queue: [String] = []
-
-    func contains(_ key: String) -> Bool {
-        return queue.contains(key)
-    }
-
-    func append(_ key: String) {
-        queue.append(key)
-    }
-    func remove(_ key: String) {
-        if let index = queue.firstIndex(of: key) {
-            queue.remove(at: index)
-        }
     }
 }

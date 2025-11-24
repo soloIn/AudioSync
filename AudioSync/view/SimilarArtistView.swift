@@ -48,7 +48,7 @@ struct SimilarArtistView: View {
         }
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(viewmodel.similarArtists) { artist in
+                ForEach(viewmodel.similarArtists, id: \.self.id) { artist in
                     Button(action: { openMusic(artist: artist.name) }) {
                         HStack(alignment: .center, spacing: 18) {
                             if !artist.url.isEmpty,
@@ -117,7 +117,7 @@ struct SimilarArtistView: View {
                 artist: artist
             )
             // 步骤 2: 使用 ID 跳转到艺术家主页 (使用 Universal Link，如 MusicNavigator 中所推荐)
-            let success = try MusicNavigator.openArtistPage(
+            _ = try MusicNavigator.openArtistPage(
                 by: String(artistID)
             )
         }

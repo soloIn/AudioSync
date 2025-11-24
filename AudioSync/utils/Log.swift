@@ -7,7 +7,7 @@ enum LogLevel: Int {
 }
 enum Log {
     static let subsystem = "com.solo.AudioSync"
-
+    static let notice = AppLogger(subsystem: subsystem, category: "notice")
     static let general = AppLogger(subsystem: subsystem, category: "general")
     static let backend = AppLogger(subsystem: subsystem, category: "backend")
     static let ui = AppLogger(subsystem: subsystem, category: "ui")
@@ -42,5 +42,8 @@ struct AppLogger {
     func error(_ message: String) {
         guard AppLogger.globalLevel.rawValue <= LogLevel.error.rawValue else { return }
         logger.error("\(message, privacy: .public)")
+    }
+    func notice(_ title: String , _ message: String) {
+        NotificationUtils.sendNotification(title: title, body: message)
     }
 }

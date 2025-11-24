@@ -17,6 +17,7 @@ struct AudioSyncApp: App {
     @ObservedObject var viewModel = ViewModel.shared
     @AppStorage("isKaraokeVisible") var isKaraokeVisible: Bool = false
     @AppStorage("isShowLoginView") var isShowLoginView: Bool = false
+    @AppStorage("isAudioSwitch") var isAudioSwitch: Bool = true
     @State var isFullScreenVisible: Bool = false
     @State var karaoKeWindow: NSWindow? = nil
     @State var selectorWindow: NSWindow? = nil
@@ -89,7 +90,7 @@ struct AudioSyncApp: App {
     }
 
     private func showSimilarArtistWindow() {
-        appDelegate.fetchSimilarArtist()
+        viewModel.refreshSimilarArtist = true
         if similarArtistWindow == nil {
             let contentView = NSHostingView(
                 rootView: SimilarArtistView()
@@ -170,14 +171,14 @@ struct AudioSyncApp: App {
                         audioManager.bitDepth ?? 0,
                         Double(audioManager.sampleRate ?? 0) / 1000.0
                     ),
-                    isOn: .constant(false)
+                    isOn: $isAudioSwitch
                 )
                 Divider()
                 Toggle("显示歌词", isOn: $isKaraokeVisible)
-                    .keyboardShortcut("s")
+                    //.keyboardShortcut("s")
                 Divider()
                 Toggle("全屏歌词", isOn: $isFullScreenVisible)
-                    .keyboardShortcut("f")
+                    //.keyboardShortcut("f")
 
                 Divider()
                 Button("相似歌手") {
@@ -186,7 +187,7 @@ struct AudioSyncApp: App {
 
                 Divider()
                 Button("删除本地缓存", action: appDelegate.delCurrentSongObject)
-                    .keyboardShortcut("d")
+                    //.keyboardShortcut("d")
                 Divider()
                 Button("剪贴板读取原始歌曲名", action: appDelegate.manualNamefetch)
 
@@ -204,6 +205,7 @@ struct AudioSyncApp: App {
                     viewModel.isViewLyricsShow =
                         isKaraokeVisible || isFullScreenVisible
                     CreateKaraoke()
+                    viewModel.enableAudioSync = isAudioSwitch
                 }
                 .onReceive(viewModel.$needNanualSelection) { newValue in
                     createLyricsManualView(needNanualSelection: newValue)
@@ -235,6 +237,9 @@ struct AudioSyncApp: App {
                 CreateKaraoke()
             }
         )
+        .onChange(of: isAudioSwitch){
+            viewModel.enableAudioSync = isAudioSwitch
+        }
         .onChange(
             of: viewModel.isLyricsPlaying,
             {
