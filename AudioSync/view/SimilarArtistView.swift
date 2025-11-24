@@ -48,11 +48,11 @@ struct SimilarArtistView: View {
         }
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(viewmodel.similarArtists, id: \.self.id) { artist in
-                    Button(action: { openMusic(artist: artist.name) }) {
+                ForEach(0 ..< viewmodel.similarArtists.count, id: \.self) { i in
+                    Button(action: { openMusic(artist: viewmodel.similarArtists[i].name) }) {
                         HStack(alignment: .center, spacing: 18) {
-                            if !artist.url.isEmpty,
-                                let url = URL(string: artist.url)
+                            if !viewmodel.similarArtists[i].url.isEmpty,
+                                let url = URL(string: viewmodel.similarArtists[i].url)
                             {
                                 // 可选头像占位
                                 AsyncImage(url: url) { image in
@@ -77,7 +77,7 @@ struct SimilarArtistView: View {
                             }
 
                             ScrollView(.horizontal, showsIndicators: false) {
-                                Text(artist.name)
+                                Text(viewmodel.similarArtists[i].name)
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(
                                         Color(NSColor.secondaryLabelColor)

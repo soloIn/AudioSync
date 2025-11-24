@@ -6,6 +6,7 @@ public class NetworkUtil {
     let fakeSpotifyUserAgentconfig = URLSessionConfiguration.default
     let fakeSpotifyUserAgentSession: URLSession
     let coverCacheActor = CoverCache()
+    var fetchSimilarArtistsAndCoversTask: Task<Void, Error>?
     init(viewModel: ViewModel) {
         fakeSpotifyUserAgentSession = URLSession(
             configuration: fakeSpotifyUserAgentconfig
@@ -183,13 +184,15 @@ public class NetworkUtil {
         return artist
     }
     func fetchSimilarArtistsAndCovers() {
-        Task {
+        fetchSimilarArtistsAndCoversTask?.cancel()
+        fetchSimilarArtistsAndCoversTask = Task {
             do {
                 // 1. 获取相似歌手
                 let fetched = try await fetchSimilarArtists(
                     name: viewModel.currentTrack?.artist ?? ""
                 )
                 await MainActor.run {
+                    viewModel.similarArtists.removeAll()
                     viewModel.similarArtists = fetched
                 }
                 // 2. 查封面

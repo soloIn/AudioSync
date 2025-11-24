@@ -1,15 +1,15 @@
 
 import SwiftData
 import Foundation
-@Model
-final class Artist: Identifiable, Sendable {
-    @Attribute(.unique) var id: String
+
+struct Artist: Identifiable, Sendable {
+    var id: String
     var mbid: String
     var name: String
     var url: String
     
     init(name: String, url: String = "", mbid: String = "") {
-        self.id = UUID().uuidString
+        self.id = "artist:\(name)+\(url)"
         self.name = name
         self.url = url
         self.mbid = mbid
