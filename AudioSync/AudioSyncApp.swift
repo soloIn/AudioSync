@@ -175,10 +175,14 @@ struct AudioSyncApp: App {
                 )
                 Divider()
                 Toggle("显示歌词", isOn: $isKaraokeVisible)
-                    //.keyboardShortcut("s")
+                //.keyboardShortcut("s")
                 Divider()
                 Toggle("全屏歌词", isOn: $isFullScreenVisible)
-                    //.keyboardShortcut("f")
+                //.keyboardShortcut("f")
+
+                //                Divider()
+                //
+                //                Button("相似歌曲", action: appDelegate.similarSongTapped)
 
                 Divider()
                 Button("相似歌手") {
@@ -187,7 +191,7 @@ struct AudioSyncApp: App {
 
                 Divider()
                 Button("删除本地缓存", action: appDelegate.delCurrentSongObject)
-                    //.keyboardShortcut("d")
+                //.keyboardShortcut("d")
                 Divider()
                 Button("剪贴板读取原始歌曲名", action: appDelegate.manualNamefetch)
 
@@ -237,7 +241,7 @@ struct AudioSyncApp: App {
                 CreateKaraoke()
             }
         )
-        .onChange(of: isAudioSwitch){
+        .onChange(of: isAudioSwitch) {
             viewModel.enableAudioSync = isAudioSwitch
         }
         .onChange(

@@ -46,7 +46,9 @@ class PlaybackNotifier {
         bundleIdentifier: "com.apple.Music"
     )
     var viewModel: ViewModel
-    
+
+    private var lastNotificationKey: String?
+
     @State var lock: Bool = false
 
     init(viewModel: ViewModel) {
@@ -72,14 +74,29 @@ class PlaybackNotifier {
             Log.backend.error(
                 "appleNotification:  userInfo is missing required fields."
             )
-            Log.notice.notice("trackInfo is missing", "apple music distributedNotification")
+            Log.notice.notice(
+                "trackInfo is missing",
+                "apple music distributedNotification"
+            )
             return
         }
+
+        let uniqueKey = userInfo.uniqueKey(using: [
+            "Name", "Artist", "Album", "Player State",
+        ])
+
+        if uniqueKey == lastNotificationKey {
+            return
+        }
+        lastNotificationKey = uniqueKey
+
         viewModel.isCurrentTrackPlaying = (state == "Playing")
         Log.backend.info("appleNotification userInfo: \(userInfo)")
         let nextAlbum = userInfo["Album"] as? String ?? ""
 
-        if !lock && state == "Playing" && !nextAlbum.isEmpty && viewModel.currentAlbum != nextAlbum && viewModel.enableAudioSync{
+        if !lock && state == "Playing" && !nextAlbum.isEmpty
+            && viewModel.currentAlbum != nextAlbum && viewModel.enableAudioSync
+        {
             lock = true
             Task {
                 defer { lock = false }
@@ -92,7 +109,7 @@ class PlaybackNotifier {
                 }
                 Log.backend.debug("play...")
                 script.setPlayerPosition?(0.0)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     script.playpause?()
                 }
 
@@ -103,7 +120,9 @@ class PlaybackNotifier {
         }
         let nextName = userInfo["Name"] as? String ?? ""
         let nextArtist = userInfo["Artist"] as? String ?? ""
-        let songKey = "\(nextName)-\(nextArtist)-\(nextAlbum)"
+        let songKey = userInfo.uniqueKey(using: [
+            "Name", "Artist", "Album",
+        ])
         if songKey != viewModel.currentSong {
             viewModel.currentSong = songKey
             let genre = userInfo["Genre"] as? String ?? ""

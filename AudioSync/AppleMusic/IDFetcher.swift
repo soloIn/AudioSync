@@ -97,19 +97,19 @@ public enum IDFetcher {
         let (data, _) = try await URLSession.shared.data(from: url)
 
         // ✅ 优化点：不要直接返回原始大图
-            guard let originalImage = NSImage(data: data) else {
-                throw IDFetchError.dataParsingError
-            }
-            
-            // 定义一个合适的最大尺寸，例如 600px
-            let targetSize = NSSize(width: 200, height: 200)
-            
-            // 如果原图比目标尺寸小，直接返回；否则进行缩放
-            if originalImage.size.width <= targetSize.width {
-                return originalImage
-            } else {
-                return originalImage.resized(to: targetSize) ?? originalImage
-            }
+        guard let originalImage = NSImage(data: data) else {
+            throw IDFetchError.dataParsingError
+        }
+
+        // 定义一个合适的最大尺寸，例如 600px
+        let targetSize = NSSize(width: 200, height: 200)
+
+        // 如果原图比目标尺寸小，直接返回；否则进行缩放
+        if originalImage.size.width <= targetSize.width {
+            return originalImage
+        } else {
+            return originalImage.resized(to: targetSize) ?? originalImage
+        }
     }
     private static func fetchSong(
         by name: String,
@@ -134,7 +134,9 @@ public enum IDFetcher {
         }
         // 3. 如果没有，就创建一个新任务
         let task = Task<SongSearchResult.Song, Error> {
-            defer { Task { await itunesSongCacheActor.removeTask(for: cacheKey) } }
+            defer {
+                Task { await itunesSongCacheActor.removeTask(for: cacheKey) }
+            }
 
             let song = try await fetchSongFromNetwork(
                 name: name,
@@ -229,12 +231,17 @@ extension NSImage {
     func resized(to newSize: NSSize) -> NSImage? {
         let newImage = NSImage(size: newSize)
         newImage.lockFocus()
-        
+
         let sourceRect = NSRect(origin: .zero, size: self.size)
         let destRect = NSRect(origin: .zero, size: newSize)
-        
-        self.draw(in: destRect, from: sourceRect, operation: .copy, fraction: 1.0)
-        
+
+        self.draw(
+            in: destRect,
+            from: sourceRect,
+            operation: .copy,
+            fraction: 1.0
+        )
+
         newImage.unlockFocus()
         return newImage
     }

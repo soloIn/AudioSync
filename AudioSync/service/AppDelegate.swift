@@ -51,7 +51,6 @@ class AppDelegate: NSObject, NSApplicationDelegate,
                                 sampleRate,
                                 bitDepth in
                                 self.audioManager.updateOutputFormat()
-                                //notifier.scriptNotification()
                                 if !didResume {
                                     didResume = true
                                     continuation.resume()
@@ -328,6 +327,22 @@ class AppDelegate: NSObject, NSApplicationDelegate,
         }
     }
 
+    @objc func similarSongTapped() {
+        guard let name = viewModel.currentTrack?.name,
+            let artist = viewModel.currentTrack?.artist
+        else {
+            return
+        }
+        Task {
+            let fetched = try? await networkUtil?.fetchSimilarSongs(
+                name: name,
+                artist: artist
+            )
+            Log.backend.debug("相似歌曲: \(JSON.stringify(fetched))")
+            guard let script = viewModel.appleMusicScript else { return }
+
+        }
+    }
 }
 
 // 修改后的AudioFormatManager类

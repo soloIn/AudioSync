@@ -23,15 +23,16 @@ class AudioFormatManager: ObservableObject {
                 sampleRate = currentFormat.sampleRate
                 bitDepth = currentFormat.bitDepth
                 needChange = true
+
+                //self.stopMonitoring()
+                onFormatUpdate?(
+                    currentFormat.sampleRate,
+                    currentFormat.bitDepth
+                )
             } else {
                 Log.backend.debug("currentFormat no change")
                 needChange = false
             }
-            self.stopMonitoring()
-            onFormatUpdate?(
-                currentFormat.sampleRate,
-                currentFormat.bitDepth
-            )
         }
     }
     var onFormatUpdate: ((Int, Int) -> Void)?

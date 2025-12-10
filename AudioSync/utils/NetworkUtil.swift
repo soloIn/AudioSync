@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 public class NetworkUtil {
@@ -78,7 +79,7 @@ public class NetworkUtil {
             var seen = Set<String>()
             viewModel.allCandidates.removeAll { candidate in
                 if seen.contains(candidate.id) {
-                    return true // 移除重复
+                    return true  // 移除重复
                 } else {
                     seen.insert(candidate.id)
                     return false
@@ -157,11 +158,12 @@ public class NetworkUtil {
 
     func fetchNetEaseArtist(name: String) async throws -> Artist? {
 
-        if let url = await coverCacheActor.get(for: name) {
-            Log.backend.debug("命中缓存 \(name) 封面：\(url)")
-            return Artist(name: name, url: url)
+        if let data = await coverCacheActor.get(for: name) {
+            Log.backend.debug("命中 \(name) 缓存封面")
+            var artist = Artist(name: name)
+            artist.image = data
+            return artist
         }
-
         let request = URLRequest(
             url: URL(
                 string:
@@ -178,9 +180,11 @@ public class NetworkUtil {
         guard let netEaseArtist = netEaseArtists.result.artists.first else {
             return nil
         }
-        let artist = Artist(name: netEaseArtist.name, url: netEaseArtist.picUrl)
+        let data = try await fetchImageData(netEaseArtist.picUrl)
+        var artist = Artist(name: netEaseArtist.name, url: netEaseArtist.picUrl)
+        artist.image = data
         Log.backend.info("找到歌手 \(name) 封面：\(artist.url)")
-        await coverCacheActor.set(artist.url, for: name)
+        await coverCacheActor.set(artist.image!, for: name)
         return artist
     }
     func fetchSimilarArtistsAndCovers() {
@@ -196,7 +200,7 @@ public class NetworkUtil {
                     viewModel.similarArtists = fetched
                 }
                 // 2. 查封面
-                await withTaskGroup(of: (Int, String?).self) { group in
+                await withTaskGroup(of: (Int, Data?).self) { group in
                     for i in await viewModel.similarArtists.indices {
                         if Task.isCancelled { break }
                         let name = await viewModel.similarArtists[i].name
@@ -204,15 +208,15 @@ public class NetworkUtil {
                             let cover = try? await self.fetchNetEaseArtist(
                                 name: name
                             )
-                            return (i, cover?.url)
+                            return (i, cover?.image)
                         }
                     }
 
-                    for await (i, url) in group {
+                    for await (i, image) in group {
                         if Task.isCancelled { break }
-                        if let url {
+                        if let image {
                             await MainActor.run {
-                                viewModel.similarArtists[i].url = url
+                                viewModel.similarArtists[i].image = image
                             }
                         }
                     }
@@ -690,17 +694,16 @@ public class NetworkUtil {
         let response = try await fakeSpotifyUserAgentSession.data(for: request)
         let decoder = JSONDecoder()
         let artistResponse = try decoder.decode(
-            ArtistResponse.self,
+            ArtistFromLastFMResponse.self,
             from: response.0
         )
-        Log.general.info("response: \(JSON.stringify(artistResponse))")
         guard let similars = artistResponse.similarartists?.artist else {
             return []
         }
         var similarArtists: [Artist] = []
         similars.forEach {
             let similarArtist = Artist(
-                name: $0.name,
+                name: $0.name.toSimplified,
                 url: $0.url,
                 mbid: $0.mbid ?? ""
             )
@@ -708,9 +711,128 @@ public class NetworkUtil {
         }
         return similarArtists
     }
+    func fetchSimilarSongs(name: String, artist: String) async throws
+        -> [SimilarSong]
+    {
+        let traditionalName = name.toTraditional
+
+        // 相同则执行原有逻辑
+        if traditionalName == name {
+            let request = URLRequest(
+                url: URL(
+                    string:
+                        "http://ws.audioscrobbler.com/2.0/?method=track.getsimilar&track=\(name)&artist=\(artist)&api_key=\(Key.lastfm)&limit=10&format=json"
+                )!
+            )
+            let response = try await fakeSpotifyUserAgentSession.data(
+                for: request
+            )
+            let decoder = JSONDecoder()
+            let songsResponse = try decoder.decode(
+                SongFromLastFMResponse.self,
+                from: response.0
+            )
+            guard let similars = songsResponse.similartracks?.track else {
+                Log.notice.notice("相似歌曲", "从lastfm未找到相似歌曲")
+                return []
+            }
+            var similarSongs: [SimilarSong] = []
+            similars.forEach {
+                let similarSong = SimilarSong(
+                    name: $0.name.toSimplified,
+                    mbid: $0.mbid ?? "",
+                    artist: $0.artist.name.toSimplified
+                )
+                similarSongs.append(similarSong)
+            }
+            return similarSongs
+        }
+
+        // 并发执行两个请求，取第一个有返回的
+        return try await withThrowingTaskGroup(of: [SimilarSong].self) {
+            group in
+            // 请求1：原名
+            group.addTask {
+                let request = URLRequest(
+                    url: URL(
+                        string:
+                            "http://ws.audioscrobbler.com/2.0/?method=track.getsimilar&track=\(name)&artist=\(artist)&api_key=\(Key.lastfm)&limit=10&format=json"
+                    )!
+                )
+                let response = try await self.fakeSpotifyUserAgentSession.data(
+                    for: request
+                )
+                let decoder = JSONDecoder()
+                let songsResponse = try decoder.decode(
+                    SongFromLastFMResponse.self,
+                    from: response.0
+                )
+                guard let similars = songsResponse.similartracks?.track else {
+                    return []
+                }
+                return similars.map {
+                    SimilarSong(
+                        name: $0.name.toSimplified,
+                        mbid: $0.mbid ?? "",
+                        artist: $0.artist.name.toSimplified
+                    )
+                }
+            }
+
+            // 请求2：繁体名
+            group.addTask {
+                let request = URLRequest(
+                    url: URL(
+                        string:
+                            "http://ws.audioscrobbler.com/2.0/?method=track.getsimilar&track=\(traditionalName)&artist=\(artist)&api_key=\(Key.lastfm)&limit=10&format=json"
+                    )!
+                )
+                let response = try await self.fakeSpotifyUserAgentSession.data(
+                    for: request
+                )
+                let decoder = JSONDecoder()
+                let songsResponse = try decoder.decode(
+                    SongFromLastFMResponse.self,
+                    from: response.0
+                )
+                guard let similars = songsResponse.similartracks?.track else {
+                    return []
+                }
+                return similars.map {
+                    SimilarSong(
+                        name: $0.name.toSimplified,
+                        mbid: $0.mbid ?? "",
+                        artist: $0.artist.name.toSimplified
+                    )
+                }
+            }
+
+            // 谁先返回非空结果就用谁
+            for try await result in group {
+                if !result.isEmpty {
+                    group.cancelAll()
+                    return result
+                }
+            }
+            Log.notice.notice("相似歌曲", "使用简繁歌曲名从lastfm未找到相似歌曲")
+            return []
+        }
+    }
+
+    func fetchImageData(_ urlString: String) async throws -> Data {
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+
+        let (data, _) = try await URLSession.shared.data(from: url)
+
+        // 直接尝试压缩
+        return try await compressImageData(data, maxWidth: 300, quality: 0.7)
+    }
 }
 
 extension String {
+
     var normalized: String {
         self
             .replacingOccurrences(
@@ -724,5 +846,18 @@ extension String {
             .replacingOccurrences(of: "（", with: "-")
             .replacingOccurrences(of: "）", with: "-")
             .lowercased()
+    }
+    var toTraditional: String {
+        self.applyingTransform(
+            StringTransform("Simplified-Traditional"),
+            reverse: false
+        ) ?? self
+    }
+
+    var toSimplified: String {
+        self.applyingTransform(
+            StringTransform("Traditional-Simplified"),
+            reverse: false
+        ) ?? self
     }
 }

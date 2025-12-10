@@ -11,7 +11,7 @@ struct SimilarArtistView: View {
     @EnvironmentObject var viewmodel: ViewModel
     var body: some View {
         if let artist = viewmodel.currentTrack?.artist {
-            HStack(spacing: 8){
+            HStack(spacing: 8) {
                 Spacer()
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
@@ -35,10 +35,10 @@ struct SimilarArtistView: View {
                     }
                 }) {
                     Image(systemName: "arrow.clockwise.circle")
-                        .font(.system(size: 18)) // 放大按钮图标
-                        .foregroundColor(.secondary) // 与整体配色一致
-                        .background(Color.clear) // 背景透明
-                        .contentShape(Circle()) // 扩大点击范围但保持透明
+                        .font(.system(size: 18))  // 放大按钮图标
+                        .foregroundColor(.secondary)  // 与整体配色一致
+                        .background(Color.clear)  // 背景透明
+                        .contentShape(Circle())  // 扩大点击范围但保持透明
                 }
                 .buttonStyle(PlainButtonStyle())
                 Spacer()
@@ -48,26 +48,20 @@ struct SimilarArtistView: View {
         }
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(0 ..< viewmodel.similarArtists.count, id: \.self) { i in
-                    Button(action: { openMusic(artist: viewmodel.similarArtists[i].name) }) {
+                ForEach(0..<viewmodel.similarArtists.count, id: \.self) { i in
+                    Button(action: {
+                        openMusic(artist: viewmodel.similarArtists[i].name)
+                    }) {
                         HStack(alignment: .center, spacing: 18) {
-                            if !viewmodel.similarArtists[i].url.isEmpty,
-                                let url = URL(string: viewmodel.similarArtists[i].url)
+                            if let image = viewmodel.similarArtists[i].image,
+                                let nsImage = NSImage(data: image)
                             {
-                                // 可选头像占位
-                                AsyncImage(url: url) { image in
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                } placeholder: {
-                                    Image(systemName: "person.crop.square")
-                                        .frame(width: 45, height: 45)
-                                        .clipShape(
-                                            RoundedRectangle(cornerRadius: 4)
-                                        )
-                                }
-                                .frame(width: 50, height: 50)
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                                Image(nsImage: nsImage)
+                                    .resizable()
+                                    .frame(width: 45, height: 45)
+                                    .clipShape(
+                                        RoundedRectangle(cornerRadius: 4)
+                                    )
                             } else {
                                 Image(systemName: "person.crop.square")
                                     .frame(width: 45, height: 45)
@@ -99,6 +93,7 @@ struct SimilarArtistView: View {
                                 )
                         )
                     }
+                    .contentShape(Rectangle())
                     .buttonStyle(PlainButtonStyle())  // 去掉默认蓝色按钮效果
                     .frame(height: 50)
                     Divider()
@@ -141,7 +136,7 @@ struct SimilarArtistView: View {
         vm.similarArtists = [
             Artist(name: "Artist A", url: ""),
             Artist(name: "Artist B", url: ""),
-            Artist( name: "Artist C", url: "")
+            Artist(name: "Artist C", url: ""),
         ]
         return vm
     }()
