@@ -13,24 +13,19 @@ class AudioFormatManager: ObservableObject {
     var needChange: Bool = true
     var currentFormat: (sampleRate: Int, bitDepth: Int) = (0, 0) {
         didSet {
+            Log.backend.info("Format change from \(oldValue) to \(currentFormat)")
             // 避免不必要的更新，如果值没有实际变化
             if oldValue.sampleRate != currentFormat.sampleRate
                 || oldValue.bitDepth != currentFormat.bitDepth
             {
-                Log.backend.info(
-                    "currentFormat changed from (\(oldValue.sampleRate), \(oldValue.bitDepth)) to (\(self.currentFormat.sampleRate), \(self.currentFormat.bitDepth))"
-                )
                 sampleRate = currentFormat.sampleRate
                 bitDepth = currentFormat.bitDepth
                 needChange = true
-
-                //self.stopMonitoring()
                 onFormatUpdate?(
                     currentFormat.sampleRate,
                     currentFormat.bitDepth
                 )
             } else {
-                Log.backend.debug("currentFormat no change")
                 needChange = false
             }
         }
@@ -90,7 +85,7 @@ class AudioFormatManager: ObservableObject {
                 "--style", "syslog",
                 "--last", "1s",
                 "--predicate",
-                "process == 'Music' AND message CONTAINS 'Input format' AND message CONTAINS 'source'",
+                "process == 'Music' AND message CONTAINS 'ACAppleLosslessDecoder' AND message CONTAINS 'Input format' AND message CONTAINS 'source'",
                 "--info",
             ]
 
@@ -122,7 +117,7 @@ class AudioFormatManager: ObservableObject {
         logProcess?.arguments = [
             "stream",
             "--predicate",
-            "process == 'Music' AND message CONTAINS 'Input format' AND message CONTAINS 'source'",
+            "process == 'Music' AND message CONTAINS 'ACAppleLosslessDecoder' AND message CONTAINS 'Input format' AND message CONTAINS 'source'",
             "--info",
         ]
 
@@ -183,17 +178,14 @@ class AudioFormatManager: ObservableObject {
             if let sr = Int(sampleRateStr), let bd = Int(bitDepthStr) {
                 // 5. ✅ 解析成功后，再检查是否需要更新，减少主线程负担
                 if self.currentFormat.sampleRate == sr,
-                    self.currentFormat.bitDepth == bd,
-                    now - self.lastLogTime < 1
+                    self.currentFormat.bitDepth == bd
                 {
                     return
                 }
-
-                self.lastLogTime = now
-
                 // 只有真正需要更新时，才切回主线程
                 Task { @MainActor in
                     AudioFormatManager.shared.currentFormat = (sr, bd)
+                    AudioFormatManager.shared.stopMonitoring()
                 }
             }
         }

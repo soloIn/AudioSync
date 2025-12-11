@@ -48,8 +48,7 @@ class PlaybackNotifier {
     var viewModel: ViewModel
 
     private var lastNotificationKey: String?
-
-    @State var lock: Bool = false
+    var lock: Bool = false
 
     init(viewModel: ViewModel) {
         self.viewModel = viewModel
@@ -84,16 +83,19 @@ class PlaybackNotifier {
         let uniqueKey = userInfo.uniqueKey(using: [
             "Name", "Artist", "Album", "Player State",
         ])
-
         if uniqueKey == lastNotificationKey {
             return
         }
         lastNotificationKey = uniqueKey
 
+        let songKey = userInfo.uniqueKey(using: [
+            "Name", "Artist", "Album",
+        ])
+    
         viewModel.isCurrentTrackPlaying = (state == "Playing")
         Log.backend.info("appleNotification userInfo: \(userInfo)")
         let nextAlbum = userInfo["Album"] as? String ?? ""
-
+        let nextName = userInfo["Name"] as? String ?? ""
         if !lock && state == "Playing" && !nextAlbum.isEmpty
             && viewModel.currentAlbum != nextAlbum && viewModel.enableAudioSync
         {
@@ -102,27 +104,23 @@ class PlaybackNotifier {
                 defer { lock = false }
                 viewModel.currentAlbum = nextAlbum
                 guard let script = self.appleMusicScript else { return }
-                script.pause?()
-                Log.backend.debug("pause...")
+                script.playpause?()
+                Log.backend.info("pause \(nextName) ⏹️")
                 if let onPlay = self.onPlay {
                     await onPlay(nil, .formatSwitch)  // 等待执行完
                 }
-                Log.backend.debug("play...")
+                
                 script.setPlayerPosition?(0.0)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    script.playpause?()
-                }
+                await waitUntilPaused(script)
+                script.playpause?()
+                Log.backend.info("play \(nextName) ✅")
 
             }
         }
         if state != "Playing" {
             viewModel.isLyricsPlaying = false
         }
-        let nextName = userInfo["Name"] as? String ?? ""
         let nextArtist = userInfo["Artist"] as? String ?? ""
-        let songKey = userInfo.uniqueKey(using: [
-            "Name", "Artist", "Album",
-        ])
         if songKey != viewModel.currentSong {
             viewModel.currentSong = songKey
             let genre = userInfo["Genre"] as? String ?? ""
@@ -169,6 +167,23 @@ class PlaybackNotifier {
         case "Playing": return .playing
         case "Paused": return .stop
         default: return .stop
+        }
+    }
+    func waitUntilPaused(
+        _ script: MusicApplication,
+        timeout: Int = 50
+    ) async {
+        for i in 0..<timeout {
+            let isPaused = await MainActor.run {
+                script.playerState != .playing
+            }
+
+            if isPaused {
+                Log.backend.info("waitUntilPaused active play time consuming : \(i * 80) ms")
+                return
+            }
+
+            try? await Task.sleep(nanoseconds: 80_000_000)
         }
     }
 }
