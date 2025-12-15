@@ -11,8 +11,8 @@ struct TrackInfo: Encodable, Equatable {
     let album: String
     let state: PlayState
     let genre: String
-    let color: [Color]?
-    let albumCover: NSImage?
+    var color: [Color]?
+    var albumCover: Data?
     enum CodingKeys: String, CodingKey {
         case name, artist, albumArtist, trackID, album, state, genre
     }
@@ -121,8 +121,8 @@ class PlaybackNotifier {
             viewModel.isLyricsPlaying = false
         }
         let nextArtist = userInfo["Artist"] as? String ?? ""
-        if songKey != viewModel.currentSong {
-            viewModel.currentSong = songKey
+        if songKey != viewModel.currentSongKey {
+            viewModel.currentSongKey = songKey
             let genre = userInfo["Genre"] as? String ?? ""
             Task {
                 let trackID = try await IDFetcher.fetchTrackID(
@@ -142,7 +142,7 @@ class PlaybackNotifier {
                     album: nextAlbum,
                     state: stringFromPlayerState(state),
                     genre: genre,
-                    color: albumData.findDominantColors(),
+                    color: NSImage(data: albumData)?.findDominantColors(),
                     albumCover: albumData
                 )
                 viewModel.currentTrack = trackInfo

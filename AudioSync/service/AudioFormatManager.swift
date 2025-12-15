@@ -161,7 +161,6 @@ class AudioFormatManager: ObservableObject {
         }
     }
     private func parseLogOnBackground(_ log: String) {
-        let now = Date().timeIntervalSince1970
         guard let regex = AudioFormatManager.logRegex else { return }
 
         let nsLog = log as NSString

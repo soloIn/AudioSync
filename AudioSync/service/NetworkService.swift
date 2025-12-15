@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-public class NetworkUtil {
+public class NetworkService {
 
     var viewModel: ViewModel
     let fakeSpotifyUserAgentconfig = URLSessionConfiguration.default
@@ -9,6 +9,7 @@ public class NetworkUtil {
     let coverCacheActor = CoverCache()
     var fetchSimilarArtistsAndCoversTask: Task<Void, Error>?
     init(viewModel: ViewModel) {
+        fakeSpotifyUserAgentconfig.timeoutIntervalForRequest = 10
         fakeSpotifyUserAgentSession = URLSession(
             configuration: fakeSpotifyUserAgentconfig
         )
@@ -130,6 +131,11 @@ public class NetworkUtil {
                         }
                     }
                 // 用户选择后，根据 ID 获取歌词
+                // 先替换封面
+                let coverData = try? await fetchImageData(selectedSong.albumCover)
+                await MainActor.run {
+                    viewModel.currentTrack?.albumCover = coverData
+                }
                 return try await fetchLyricsByID(song: selectedSong)
             } catch FetchError.manualSelectionTimeout {
                 await MainActor.run {
@@ -156,13 +162,11 @@ public class NetworkUtil {
         case parsingError(String)
     }
 
-    func fetchNetEaseArtist(name: String) async throws -> Artist? {
+    func fetchNetEaseArtistCover(name: String) async throws -> Data? {
 
         if let data = await coverCacheActor.get(for: name) {
             Log.backend.debug("命中 \(name) 缓存封面")
-            var artist = Artist(name: name)
-            artist.image = data
-            return artist
+            return data
         }
         let request = URLRequest(
             url: URL(
@@ -181,11 +185,9 @@ public class NetworkUtil {
             return nil
         }
         let data = try await fetchImageData(netEaseArtist.picUrl)
-        var artist = Artist(name: netEaseArtist.name, url: netEaseArtist.picUrl)
-        artist.image = data
-        Log.backend.info("找到歌手 \(name) 封面：\(artist.url)")
-        await coverCacheActor.set(artist.image!, for: name)
-        return artist
+        Log.backend.info("找到歌手 \(name) 封面：\(netEaseArtist.picUrl)")
+        await coverCacheActor.set(data, for: name)
+        return data
     }
     func fetchSimilarArtistsAndCovers() {
         fetchSimilarArtistsAndCoversTask?.cancel()
@@ -199,24 +201,33 @@ public class NetworkUtil {
                     viewModel.similarArtists.removeAll()
                     viewModel.similarArtists = fetched
                 }
-                // 2. 查封面
-                await withTaskGroup(of: (Int, Data?).self) { group in
-                    for i in await viewModel.similarArtists.indices {
+                // 2. 查封面和补充信息
+                await withTaskGroup(of: (Int, Data?, String?).self) { group in
+                    let artists = await viewModel.similarArtists
+
+                    for i in artists.indices {
                         if Task.isCancelled { break }
-                        let name = await viewModel.similarArtists[i].name
+                        let name = artists[i].name
+                        let source = artists[i].sourceName
+
                         group.addTask {
-                            let cover = try? await self.fetchNetEaseArtist(
-                                name: name
-                            )
-                            return (i, cover?.image)
+                            let coverData = try? await self.fetchNetEaseArtistCover(name: name)
+                            async let info = try? await self.fetchArtistInfo(artist: source)
+
+                            let bio = await info?.artist.bio.content
+
+                            return (i, coverData, bio?.collapseSpaces)
                         }
                     }
 
-                    for await (i, image) in group {
+                    for await (i, image, bio) in group {
                         if Task.isCancelled { break }
-                        if let image {
-                            await MainActor.run {
+                        await MainActor.run {
+                            if let image {
                                 viewModel.similarArtists[i].image = image
+                            }
+                            if let bio {
+                                viewModel.similarArtists[i].content = bio
                             }
                         }
                     }
@@ -237,6 +248,7 @@ public class NetworkUtil {
                 "https://neteasecloudmusicapi-ten-wine.vercel.app/cloudsearch?keywords=\(trackName) \(artist)&limit=5"
         ) {
             do {
+                Log.backend.debug("netease song request \(url)")
                 let request = URLRequest(url: url)
                 let urlResponseAndData =
                     try await fakeSpotifyUserAgentSession.data(
@@ -285,6 +297,12 @@ public class NetworkUtil {
                         }
                     }
                     return []
+                }
+
+                // 替换封面数据
+                let coverData = try? await fetchImageData(song.al.picUrl)
+                await MainActor.run {
+                    viewModel.currentTrack?.albumCover = coverData
                 }
 
                 let lyricRequest = URLRequest(
@@ -345,6 +363,7 @@ public class NetworkUtil {
                 "https://c.y.qq.com/soso/fcgi-bin/client_search_cp?p=1&n=5&w=\(trackName) \(artist)"
         ) {
             do {
+                Log.backend.debug("qq song request \(url)")
                 let request = URLRequest(url: url)
                 let urlResponseAndData =
                     try await fakeSpotifyUserAgentSession.data(
@@ -408,6 +427,16 @@ public class NetworkUtil {
                     }
                     return []
                 }
+                // 替换封面数据
+                if let albumid = QQSong?.albummid,
+                    let cover = try? await fetchQQAlbumCoverByID(id: albumid)
+                {
+                    let coverData = try? await fetchImageData(cover)
+                    await MainActor.run {
+                        viewModel.currentTrack?.albumCover = coverData
+                    }
+                }
+
                 let url = URL(
                     string:
                         "https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=\(QQSong!.songmid)&g_tk=5381"
@@ -684,7 +713,7 @@ public class NetworkUtil {
         }
         return ""
     }
-    func fetchSimilarArtists(name: String) async throws -> [Artist] {
+    func fetchSimilarArtists(name: String) async throws -> [ArtistFromLastFM] {
         let request = URLRequest(
             url: URL(
                 string:
@@ -694,15 +723,16 @@ public class NetworkUtil {
         let response = try await fakeSpotifyUserAgentSession.data(for: request)
         let decoder = JSONDecoder()
         let artistResponse = try decoder.decode(
-            ArtistFromLastFMResponse.self,
+            SimilarArtistFromLastFMResponse.self,
             from: response.0
         )
         guard let similars = artistResponse.similarartists?.artist else {
             return []
         }
-        var similarArtists: [Artist] = []
+        var similarArtists: [ArtistFromLastFM] = []
         similars.forEach {
-            let similarArtist = Artist(
+            let similarArtist = ArtistFromLastFM(
+                sourceName: $0.name,
                 name: $0.name.toSimplified,
                 url: $0.url,
                 mbid: $0.mbid ?? ""
@@ -710,6 +740,21 @@ public class NetworkUtil {
             similarArtists.append(similarArtist)
         }
         return similarArtists
+    }
+    func fetchArtistInfo(artist: String) async throws -> ArtistFromLastFMResponse{
+        let request = URLRequest(
+            url: URL(
+                string:
+                    "http://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist=\(artist)&api_key=\(Key.lastfm)&lang=zh&format=json"
+            )!
+        )
+        let response = try await fakeSpotifyUserAgentSession.data(for: request)
+        let decoder = JSONDecoder()
+        let artistResponse = try decoder.decode(
+            ArtistFromLastFMResponse.self,
+            from: response.0
+        )
+        return artistResponse
     }
     func fetchSimilarSongs(name: String, artist: String) async throws
         -> [SimilarSong]
@@ -827,37 +872,6 @@ public class NetworkUtil {
         let (data, _) = try await URLSession.shared.data(from: url)
 
         // 直接尝试压缩
-        return try await compressImageData(data, maxWidth: 300, quality: 0.7)
-    }
-}
-
-extension String {
-
-    var normalized: String {
-        self
-            .replacingOccurrences(
-                of: #"\s+"#,
-                with: " ",
-                options: .regularExpression
-            )
-            .replacingOccurrences(of: "(", with: "-")
-            .replacingOccurrences(of: ")", with: "-")
-            .replacingOccurrences(of: "：", with: "-")
-            .replacingOccurrences(of: "（", with: "-")
-            .replacingOccurrences(of: "）", with: "-")
-            .lowercased()
-    }
-    var toTraditional: String {
-        self.applyingTransform(
-            StringTransform("Simplified-Traditional"),
-            reverse: false
-        ) ?? self
-    }
-
-    var toSimplified: String {
-        self.applyingTransform(
-            StringTransform("Traditional-Simplified"),
-            reverse: false
-        ) ?? self
+        return try await compressImageData(data, maxWidth: 500, quality: 0.8)
     }
 }

@@ -16,8 +16,9 @@ struct LyricsSelectorView: View {
                 if let trackName = viewModel.currentTrack?.name {
                     HStack(spacing: 12) {
                         // 左侧封面（圆角封面图片，支持 NSImage 转换；无图时显示默认占位图形）
-                        if let albumCover = viewModel.currentTrack?.albumCover {
-                            albumCover.toSwiftUIImage()
+                        if let albumCover = viewModel.currentTrack?.albumCover,
+                            let albumCoverImage = NSImage(data: albumCover){
+                            albumCoverImage.toSwiftUIImage()
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .frame(width: 45, height: 45)

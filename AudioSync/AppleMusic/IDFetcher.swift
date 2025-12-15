@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Foundation
 
 // MARK: - 1. JSON 解析模型
@@ -86,7 +87,7 @@ public enum IDFetcher {
         name: String,
         artist: String,
         countryCode: String = "cn"
-    ) async throws -> NSImage {
+    ) async throws -> Data {
         let song = try await fetchSong(by: name, by: artist)
         // 1. 构造 URL
         guard let url = URL(string: song.artworkUrl) else {
@@ -95,21 +96,21 @@ public enum IDFetcher {
 
         // 2. 下载图片数据
         let (data, _) = try await URLSession.shared.data(from: url)
-
-        // ✅ 优化点：不要直接返回原始大图
-        guard let originalImage = NSImage(data: data) else {
-            throw IDFetchError.dataParsingError
-        }
-
-        // 定义一个合适的最大尺寸，例如 600px
-        let targetSize = NSSize(width: 200, height: 200)
-
-        // 如果原图比目标尺寸小，直接返回；否则进行缩放
-        if originalImage.size.width <= targetSize.width {
-            return originalImage
-        } else {
-            return originalImage.resized(to: targetSize) ?? originalImage
-        }
+        return data
+//        // ✅ 优化点：不要直接返回原始大图
+//        guard let originalImage = NSImage(data: data) else {
+//            throw IDFetchError.dataParsingError
+//        }
+//
+//        // 定义一个合适的最大尺寸，例如 600px
+//        let targetSize = NSSize(width: 500, height: 500)
+//
+//        // 如果原图比目标尺寸小，直接返回；否则进行缩放
+//        if originalImage.size.width <= targetSize.width {
+//            return originalImage
+//        } else {
+//            return originalImage.resized(to: targetSize) ?? originalImage
+//        }
     }
     private static func fetchSong(
         by name: String,
@@ -227,22 +228,4 @@ public enum IDFetcher {
         }
     }
 }
-extension NSImage {
-    func resized(to newSize: NSSize) -> NSImage? {
-        let newImage = NSImage(size: newSize)
-        newImage.lockFocus()
 
-        let sourceRect = NSRect(origin: .zero, size: self.size)
-        let destRect = NSRect(origin: .zero, size: newSize)
-
-        self.draw(
-            in: destRect,
-            from: sourceRect,
-            operation: .copy,
-            fraction: 1.0
-        )
-
-        newImage.unlockFocus()
-        return newImage
-    }
-}

@@ -28,7 +28,7 @@
 		F85F5BE22E82694D00EFD18F /* KaraokeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BCA2E82694D00EFD18F /* KaraokeView.swift */; };
 		F85F5BE32E82694D00EFD18F /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BCB2E82694D00EFD18F /* Log.swift */; };
 		F85F5BE52E82694D00EFD18F /* LyricsSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BCD2E82694D00EFD18F /* LyricsSelectorView.swift */; };
-		F85F5BE62E82694D00EFD18F /* NetworkUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BCE2E82694D00EFD18F /* NetworkUtil.swift */; };
+		F85F5BE62E82694D00EFD18F /* NetworkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BCE2E82694D00EFD18F /* NetworkService.swift */; };
 		F85F5BE72E82694D00EFD18F /* PlaybackNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BCF2E82694D00EFD18F /* PlaybackNotifier.swift */; };
 		F85F5BE82E82694D00EFD18F /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85F5BD02E82694D00EFD18F /* Utils.swift */; };
 		F86657082DDC252100E55B82 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = F86657072DDC251800E55B82 /* README.md */; };
@@ -36,7 +36,8 @@
 		F890FD042ED2B36D00501979 /* Caches.swift in Sources */ = {isa = PBXBuildFile; fileRef = F890FD032ED2B36500501979 /* Caches.swift */; };
 		F8B059382EE52AD0006B7239 /* SimilarSongView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8B059372EE52AD0006B7239 /* SimilarSongView.swift */; };
 		F8D979A62EBC757400BDD992 /* SimilarArtistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D979A52EBC757400BDD992 /* SimilarArtistView.swift */; };
-		F8E18C7F2EBB0EF700EA75DC /* Artist.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E18C7E2EBB0EF200EA75DC /* Artist.swift */; };
+		F8E18C7F2EBB0EF700EA75DC /* ArtistFromLastFM.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E18C7E2EBB0EF200EA75DC /* ArtistFromLastFM.swift */; };
+		F8E50A632EEFD81400781430 /* TooltipPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E50A612EEFD81400781430 /* TooltipPopoverController.swift */; };
 		F8F61C9D2DC0999C007B028F /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8F61C9C2DC0999C007B028F /* AppKit.framework */; };
 		F8F61C9F2DC099A4007B028F /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8F61C9E2DC099A4007B028F /* CoreAudio.framework */; };
 		F8F61CA12DC099AB007B028F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8F61CA02DC099AB007B028F /* Foundation.framework */; };
@@ -65,7 +66,7 @@
 		F85F5BCA2E82694D00EFD18F /* KaraokeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KaraokeView.swift; sourceTree = "<group>"; };
 		F85F5BCB2E82694D00EFD18F /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 		F85F5BCD2E82694D00EFD18F /* LyricsSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsSelectorView.swift; sourceTree = "<group>"; };
-		F85F5BCE2E82694D00EFD18F /* NetworkUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkUtil.swift; sourceTree = "<group>"; };
+		F85F5BCE2E82694D00EFD18F /* NetworkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkService.swift; sourceTree = "<group>"; };
 		F85F5BCF2E82694D00EFD18F /* PlaybackNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackNotifier.swift; sourceTree = "<group>"; };
 		F85F5BD02E82694D00EFD18F /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
 		F86657072DDC251800E55B82 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
@@ -73,7 +74,8 @@
 		F890FD032ED2B36500501979 /* Caches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Caches.swift; sourceTree = "<group>"; };
 		F8B059372EE52AD0006B7239 /* SimilarSongView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimilarSongView.swift; sourceTree = "<group>"; };
 		F8D979A52EBC757400BDD992 /* SimilarArtistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimilarArtistView.swift; sourceTree = "<group>"; };
-		F8E18C7E2EBB0EF200EA75DC /* Artist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artist.swift; sourceTree = "<group>"; };
+		F8E18C7E2EBB0EF200EA75DC /* ArtistFromLastFM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtistFromLastFM.swift; sourceTree = "<group>"; };
+		F8E50A612EEFD81400781430 /* TooltipPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TooltipPopoverController.swift; sourceTree = "<group>"; };
 		F8F61C892DC097BD007B028F /* AudioSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AudioSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8F61C9C2DC0999C007B028F /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		F8F61C9E2DC099A4007B028F /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
@@ -98,7 +100,6 @@
 		F85F5BBA2E82694D00EFD18F /* LyricsParser */ = {
 			isa = PBXGroup;
 			children = (
-				F85F5BB72E82694D00EFD18F /* Extensions.swift */,
 				F85F5BB82E82694D00EFD18F /* LyricsHeader.swift */,
 				F85F5BB92E82694D00EFD18F /* LyricsParser.swift */,
 			);
@@ -110,7 +111,7 @@
 			children = (
 				F890FD032ED2B36500501979 /* Caches.swift */,
 				F86B79052EC18C8200CC9DDB /* Key.swift */,
-				F8E18C7E2EBB0EF200EA75DC /* Artist.swift */,
+				F8E18C7E2EBB0EF200EA75DC /* ArtistFromLastFM.swift */,
 				F85F5BBB2E82694D00EFD18F /* LyricStruct.swift */,
 				F85F5BBC2E82694D00EFD18F /* Song.swift */,
 				F85F5BBD2E82694D00EFD18F /* ViewModel.swift */,
@@ -129,6 +130,7 @@
 		F85F5BD12E82694D00EFD18F /* AudioSync */ = {
 			isa = PBXGroup;
 			children = (
+				F8E50A622EEFD81400781430 /* controller */,
 				F86B79082EC18CD200CC9DDB /* AppleMusic */,
 				F85F5BBA2E82694D00EFD18F /* LyricsParser */,
 				F85F5BBE2E82694D00EFD18F /* model */,
@@ -149,8 +151,8 @@
 			children = (
 				F81EEB562EC42D580038745E /* NotificationUtils.swift */,
 				F85F5BCB2E82694D00EFD18F /* Log.swift */,
-				F85F5BCE2E82694D00EFD18F /* NetworkUtil.swift */,
 				F85F5BD02E82694D00EFD18F /* Utils.swift */,
+				F85F5BB72E82694D00EFD18F /* Extensions.swift */,
 			);
 			path = utils;
 			sourceTree = "<group>";
@@ -175,6 +177,7 @@
 				F85F5BC32E82694D00EFD18F /* AppleMusicScripting.swift */,
 				F85F5BC52E82694D00EFD18F /* AudioFormatManager.swift */,
 				F85F5BCF2E82694D00EFD18F /* PlaybackNotifier.swift */,
+				F85F5BCE2E82694D00EFD18F /* NetworkService.swift */,
 			);
 			path = service;
 			sourceTree = "<group>";
@@ -186,6 +189,14 @@
 				F807B2F22EB9B2AF0093F91B /* MusicNavigator.swift */,
 			);
 			path = AppleMusic;
+			sourceTree = "<group>";
+		};
+		F8E50A622EEFD81400781430 /* controller */ = {
+			isa = PBXGroup;
+			children = (
+				F8E50A612EEFD81400781430 /* TooltipPopoverController.swift */,
+			);
+			path = controller;
 			sourceTree = "<group>";
 		};
 		F8F61C802DC097BD007B028F = {
@@ -300,12 +311,13 @@
 				F807B2F32EB9B2B30093F91B /* MusicNavigator.swift in Sources */,
 				F85F5BD92E82694D00EFD18F /* LyricStruct.swift in Sources */,
 				F85F5BDA2E82694D00EFD18F /* Song.swift in Sources */,
+				F8E50A632EEFD81400781430 /* TooltipPopoverController.swift in Sources */,
 				F85F5BDB2E82694D00EFD18F /* ViewModel.swift in Sources */,
 				F85F5BDC2E82694D00EFD18F /* AnimatedMeshGradientView.swift in Sources */,
 				F890FD042ED2B36D00501979 /* Caches.swift in Sources */,
 				F85F5BDD2E82694D00EFD18F /* AppDelegate.swift in Sources */,
 				F85F5BDE2E82694D00EFD18F /* AppleMusicScripting.swift in Sources */,
-				F8E18C7F2EBB0EF700EA75DC /* Artist.swift in Sources */,
+				F8E18C7F2EBB0EF700EA75DC /* ArtistFromLastFM.swift in Sources */,
 				F85F5BDF2E82694D00EFD18F /* AudioFormatManager.swift in Sources */,
 				F85F5BE02E82694D00EFD18F /* AudioSyncApp.swift in Sources */,
 				F85F5BE12E82694D00EFD18F /* FullScreenView.swift in Sources */,
@@ -317,7 +329,7 @@
 				F81EEB572EC42D680038745E /* NotificationUtils.swift in Sources */,
 				F86B79062EC18C9600CC9DDB /* Key.swift in Sources */,
 				F85F5BE52E82694D00EFD18F /* LyricsSelectorView.swift in Sources */,
-				F85F5BE62E82694D00EFD18F /* NetworkUtil.swift in Sources */,
+				F85F5BE62E82694D00EFD18F /* NetworkService.swift in Sources */,
 				F85F5BE72E82694D00EFD18F /* PlaybackNotifier.swift in Sources */,
 				F85F5BE82E82694D00EFD18F /* Utils.swift in Sources */,
 			);
@@ -465,6 +477,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AudioSync/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "App 需要控制 Music 以获取当前播放状态和歌词同步";
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "需要访问 Apple Music 来同步歌词";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -496,6 +509,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AudioSync/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "App 需要控制 Music 以获取当前播放状态和歌词同步";
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "需要访问 Apple Music 来同步歌词";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";

@@ -7,6 +7,104 @@
 
 import SwiftUI
 
+struct HoverTextCard: View {
+    let text: String
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            Text(text)
+                .font(.system(size: 13))
+                .foregroundColor(Color(NSColor.secondaryLabelColor))
+                .multilineTextAlignment(.leading)
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+struct SimilarArtistRowView: View {
+    let artist: ArtistFromLastFM
+
+    var body: some View {
+        Button(action: {
+            openMusic(artist: artist.name)
+        }) {
+            HStack(alignment: .center, spacing: 18) {
+                artistImage
+                artistInfo
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .center)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(NSColor.windowBackgroundColor).opacity(0.15))
+            )
+        }
+        .contentShape(Rectangle())
+        .buttonStyle(PlainButtonStyle())
+        .frame(height: 120)
+    }
+
+    private var artistImage: some View {
+        Group {
+            if let image = artist.image,
+                let nsImage = NSImage(data: image)
+            {
+                Image(nsImage: nsImage)
+                    .resizable()
+            } else {
+                Image(systemName: "person.crop.square")
+            }
+        }
+        .frame(width: 116, height: 116)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+
+    private var artistInfo: some View {
+        VStack {
+            ScrollView(.horizontal, showsIndicators: false) {
+                Text(artist.name)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(Color(NSColor.secondaryLabelColor))
+            }
+            .frame(height: 25, alignment: .leading)
+
+            if let content = artist.content {
+                HoverableContentView(
+                    content: content
+                )
+            }
+        }
+    }
+
+    private func openMusic(artist: String) {
+        Task {
+            let artistID = try await IDFetcher.fetchArtistID(
+                name: "",
+                artist: artist
+            )
+            // 步骤 2: 使用 ID 跳转到艺术家主页 (使用 Universal Link，如 MusicNavigator 中所推荐)
+            _ = try MusicNavigator.openArtistPage(
+                by: String(artistID)
+            )
+        }
+    }
+}
+struct HoverableContentView: View {
+    let content: String
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Text(content)
+                .font(.system(size: 13))
+                .foregroundColor(Color(NSColor.tertiaryLabelColor))
+                .lineLimit(3)
+                .multilineTextAlignment(.leading)
+                .systemTooltip(content)
+        }
+    }
+}
+
 struct SimilarArtistView: View {
     @EnvironmentObject var viewmodel: ViewModel
     var body: some View {
@@ -22,7 +120,7 @@ struct SimilarArtistView: View {
                     }
                     .frame(minWidth: 120)
                 }
-                .frame(width: 120)
+                .frame(width: 180)
                 Text(" 相似歌手")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(
@@ -44,58 +142,18 @@ struct SimilarArtistView: View {
                 Spacer()
             }
             .padding(5)
-            .frame(width: 250)
+            .frame(width: 300)
         }
         ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(0..<viewmodel.similarArtists.count, id: \.self) { i in
-                    Button(action: {
-                        openMusic(artist: viewmodel.similarArtists[i].name)
-                    }) {
-                        HStack(alignment: .center, spacing: 18) {
-                            if let image = viewmodel.similarArtists[i].image,
-                                let nsImage = NSImage(data: image)
-                            {
-                                Image(nsImage: nsImage)
-                                    .resizable()
-                                    .frame(width: 45, height: 45)
-                                    .clipShape(
-                                        RoundedRectangle(cornerRadius: 4)
-                                    )
-                            } else {
-                                Image(systemName: "person.crop.square")
-                                    .frame(width: 45, height: 45)
-                                    .clipShape(
-                                        RoundedRectangle(cornerRadius: 4)
-                                    )
-                            }
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                Text(viewmodel.similarArtists[i].name)
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(
-                                        Color(NSColor.secondaryLabelColor)
-                                    )
-                                    .padding()
-                            }
-                            .frame(width: 120, alignment: .center)
-
-                        }
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(
-                                    Color(NSColor.windowBackgroundColor)
-                                        .opacity(
-                                            0.15
-                                        )
-                                )
-                        )
-                    }
-                    .contentShape(Rectangle())
-                    .buttonStyle(PlainButtonStyle())  // 去掉默认蓝色按钮效果
-                    .frame(height: 50)
+            LazyVStack(spacing: 8) {
+                ForEach(
+                    Array(viewmodel.similarArtists.enumerated()),
+                    id: \.offset
+                ) { index, artist in
+                    SimilarArtistRowView(
+                        artist: artist
+                    )
+                    .environmentObject(viewmodel)
                     Divider()
                 }
             }
@@ -103,44 +161,5 @@ struct SimilarArtistView: View {
         .cornerRadius(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.controlBackgroundColor))  // 整体背景色
-        //.padding(.vertical, 16)
     }
-    private func openMusic(artist: String) {
-        Task {
-            let artistID = try await IDFetcher.fetchArtistID(
-                name: "",
-                artist: artist
-            )
-            // 步骤 2: 使用 ID 跳转到艺术家主页 (使用 Universal Link，如 MusicNavigator 中所推荐)
-            _ = try MusicNavigator.openArtistPage(
-                by: String(artistID)
-            )
-        }
-    }
-}
-
-#Preview {
-    let previewViewModel: ViewModel = {
-        let vm = ViewModel()
-        vm.currentTrack = TrackInfo(
-            name: "nextName",
-            artist: "nextArtist",
-            albumArtist: "nextAlbum",
-            trackID: "trackID",
-            album: "nextAlbum",
-            state: .playing,
-            genre: "genre",
-            color: [],
-            albumCover: nil
-        )
-        vm.similarArtists = [
-            Artist(name: "Artist A", url: ""),
-            Artist(name: "Artist B", url: ""),
-            Artist(name: "Artist C", url: ""),
-        ]
-        return vm
-    }()
-
-    SimilarArtistView()
-        .environmentObject(previewViewModel)
 }

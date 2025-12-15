@@ -18,24 +18,33 @@ import UserNotifications
 class AppDelegate: NSObject, NSApplicationDelegate,
     UNUserNotificationCenterDelegate
 {
+    var openWindow: OpenWindowAction?
+
+    // 窗口引用
+    var karaoKeWindow: NSWindow?
+    var selectorWindow: NSWindow?
+    var similarArtistWindow: NSWindow?
+
     var statusBarItem: NSStatusItem!
     var audioManager = AudioFormatManager.shared
     var playbackNotifier: PlaybackNotifier?
-    var networkUtil: NetworkUtil?
+    var networkUtil: NetworkService?
     @ObservedObject var viewModel: ViewModel = ViewModel.shared
     private var cancellables = Set<AnyCancellable>()
     var modelContainer: ModelContainer?
     private var networkQueue = NetWorkQueue()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-
+        //只有菜单栏图标，无 Dock 图标
         NSApp.setActivationPolicy(.accessory)
-
+        // 设置通知代理
         UNUserNotificationCenter.current().delegate = self
         Task { @MainActor in
+            // 1. 启动播放监听
             playbackNotifier = PlaybackNotifier(viewModel: self.viewModel)
-            networkUtil = NetworkUtil(viewModel: self.viewModel)
-
+            // 2. 初始化网络服务
+            networkUtil = NetworkService(viewModel: self.viewModel)
+            // 3. 配置音乐通知回调
             self.playbackNotifier?.onPlay = {
                 [weak self] trackInfo, trigger in
                 Log.backend.debug("playbackNotifier.onPlay \(trigger)")
@@ -89,52 +98,13 @@ class AppDelegate: NSObject, NSApplicationDelegate,
                     }
                 }
             }
-
-            viewModel.$refreshSimilarArtist
-                .removeDuplicates()
-                .sink { [weak self] refreshSimilarArtist in
-                    guard let self = self else { return }
-                    if refreshSimilarArtist {
-                        networkUtil?.fetchSimilarArtistsAndCovers()
-                        viewModel.refreshSimilarArtist = false
-                    }
-
-                }
-                .store(in: &cancellables)
-
-            viewModel.$isViewLyricsShow
-                .removeDuplicates()
-                .sink { [weak self] isShowLyrics in
-                    guard let self = self else { return }
-                    Log.general.debug("显示歌词 -> \(isShowLyrics)")
-                    if isShowLyrics {
-                        Task {
-                            if let onPlay = self.playbackNotifier?.onPlay {
-                                await onPlay(nil, .lyrics)
-                            }
-                        }
-                    } else {
-                        viewModel.stopLyricUpdater()
-                    }
-                }
-                .store(in: &cancellables)
-
-            viewModel.$isLyricsPlaying
-                .removeDuplicates()
-                .sink { [weak self] isLyricsPlaying in
-                    guard let self = self else { return }
-                    Log.general.debug("isLyricsPlaying -> \(isLyricsPlaying)")
-                    if isLyricsPlaying {
-                        viewModel.startLyricUpdater()
-                    } else {
-                        viewModel.stopLyricUpdater()
-                        viewModel.currentlyPlayingLyricsIndex = nil
-                    }
-                }
-                .store(in: &cancellables)
+            // 4. 绑定属性监听
+            setupBindings()
 
         }
+        // 权限及其他初始化
         Task {
+
             let _ = await MusicKit.MusicAuthorization.request()
 
             do {
@@ -143,13 +113,238 @@ class AppDelegate: NSObject, NSApplicationDelegate,
             } catch {
                 Log.backend.error("用户拒绝了通知权限")
             }
-            // 出发启动时歌词显示
+
+            // 触发启动时歌词显示
             if let onPlay = self.playbackNotifier?.onPlay {
                 await onPlay(nil, .lyrics)
             }
 
         }
 
+    }
+    private func setupBindings() {
+        // 刷新相似歌手
+        viewModel.$refreshSimilarArtist
+            .removeDuplicates()
+            .sink { [weak self] refreshSimilarArtist in
+                guard let self = self else { return }
+                if refreshSimilarArtist {
+                    networkUtil?.fetchSimilarArtistsAndCovers()
+                    viewModel.refreshSimilarArtist = false
+                }
+
+            }
+            .store(in: &cancellables)
+        // 是否显示歌词
+        viewModel.$isViewLyricsShow
+            .removeDuplicates()
+            .sink { [weak self] isShowLyrics in
+                guard let self = self else { return }
+                Log.general.debug("显示歌词 -> \(isShowLyrics)")
+                if isShowLyrics {
+                    Task {
+                        if let onPlay = self.playbackNotifier?.onPlay {
+                            await onPlay(nil, .lyrics)
+                        }
+                    }
+                } else {
+                    viewModel.stopLyricUpdater()
+                }
+            }
+            .store(in: &cancellables)
+        // 歌词是否在播放
+        viewModel.$isLyricsPlaying
+            .removeDuplicates()
+            .sink { [weak self] isLyricsPlaying in
+                guard let self = self else { return }
+                Log.general.debug("播放歌词 -> \(isLyricsPlaying)")
+                Task {
+                    await MainActor.run {
+                        self.updateKaraokeWindow()
+                    }
+                }
+                if isLyricsPlaying {
+                    viewModel.startLyricUpdater()
+                } else {
+                    viewModel.stopLyricUpdater()
+                    viewModel.currentlyPlayingLyricsIndex = nil
+                }
+            }
+            .store(in: &cancellables)
+        // 歌词选择窗口切换
+        viewModel.$needNanualSelection
+            .removeDuplicates()
+            .sink { [weak self] needNanualSelection in
+                guard let self = self else { return }
+                Task{
+                    await MainActor.run{
+                        self.toggleLyricsSelector(show: needNanualSelection)
+                    }
+                }
+
+            }
+            .store(in: &cancellables)
+        viewModel.$isFullScreenVisible
+            .removeDuplicates()
+            .sink { [weak self] isFullScreenVisible in
+                guard let self else { return }
+                Log.backend.info(
+                    "viewModel.$isFullScreenVisible change \(isFullScreenVisible)"
+                )
+                viewModel.isViewLyricsShow =
+                    viewModel.isKaraokeVisible || isFullScreenVisible
+                if isFullScreenVisible {
+                    guard let selfOpenWindow = openWindow else { return }
+                    Task {
+                        await MainActor.run {
+                            selfOpenWindow(id: "fullScreen")
+                            NSApplication.shared.activate()
+                        }
+                    }
+                }
+                // 全屏时去掉卡拉OK显示
+                Task{
+                    await MainActor.run{
+                        self.updateKaraokeWindow()
+                    }
+                }
+            }
+            .store(in: &cancellables)
+        viewModel.$isKaraokeVisible
+            .removeDuplicates()
+            .sink { [weak self] isKaraokeVisible in
+                guard let self else { return }
+                Log.backend.info(
+                    "viewModel.$isKaraokeVisible change \(isKaraokeVisible)"
+                )
+                viewModel.isViewLyricsShow =
+                    isKaraokeVisible || viewModel.isFullScreenVisible
+                Task{
+                    await MainActor.run{
+                        self.updateKaraokeWindow()
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+    }
+    func showSimilarArtistWindow() {
+        viewModel.refreshSimilarArtist = true
+        if similarArtistWindow == nil {
+            let contentView = NSHostingView(
+                rootView: SimilarArtistView()
+                    .environmentObject(viewModel)
+            )
+
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 420, height: 450),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            // window.title = "相似歌手"
+            window.center()
+            window.contentView = contentView
+            window.level = .floating  // 🔹关键：浮动在其他应用前
+            //window.isMovableByWindowBackground = true
+            window.isReleasedWhenClosed = false
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)  // 保证出现在最前
+
+            similarArtistWindow = window
+        } else {
+            similarArtistWindow?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+    // 创建或更新卡拉OK窗口
+    func updateKaraokeWindow() {
+        // 显示条件：开启开关 && 非全屏 && 需要显示歌词 && 有歌词正在播放
+        if viewModel.isKaraokeVisible && !viewModel.isFullScreenVisible
+            && viewModel.isViewLyricsShow
+        {
+            if karaoKeWindow == nil {
+                let contentView = NSHostingView(
+                    rootView: KaraokeView().environmentObject(viewModel)
+                )
+                karaoKeWindow = NSWindow(
+                    contentRect: NSRect(x: 0, y: 100, width: 800, height: 100),
+                    styleMask: [.borderless],
+                    backing: .buffered,
+                    defer: false
+                )
+
+                karaoKeWindow?.contentView = contentView
+                karaoKeWindow?.isOpaque = false
+                karaoKeWindow?.backgroundColor = .clear
+                karaoKeWindow?.level = .floating
+
+                if let screenFrame = NSScreen.main?.visibleFrame {
+                    let windowHeight: CGFloat = 100
+                    let windowY = screenFrame.minY
+                    let windowX = (screenFrame.width - 800) / 2
+                    karaoKeWindow?.setFrame(
+                        NSRect(
+                            x: windowX,
+                            y: windowY,
+                            width: 800,
+                            height: windowHeight
+                        ),
+                        display: false
+                    )
+                }
+
+                karaoKeWindow?.isMovableByWindowBackground = true
+            }
+            karaoKeWindow?.orderFrontRegardless()
+        } else {
+            karaoKeWindow?.orderOut(nil)
+        }
+    }
+    // 显示手动选择歌词窗口
+    func toggleLyricsSelector(show: Bool) {
+        if show {
+            if selectorWindow == nil {
+                let contentView = NSHostingView(
+                    rootView: LyricsSelectorView().environmentObject(
+                        viewModel
+                    )
+                )
+                selectorWindow = NSWindow(
+                    contentRect: NSRect(x: 0, y: 450, width: 450, height: 450),
+                    styleMask: [.borderless],  // 无边框
+                    backing: .buffered,
+                    defer: false
+                )
+                selectorWindow?.contentView = contentView
+                selectorWindow?.isOpaque = false
+                selectorWindow?.backgroundColor = .clear
+                selectorWindow?.level = .floating  // 后续会修改为前置显示
+                // 精确让窗口贴近屏幕底部
+                if let screenFrame = NSScreen.main?.visibleFrame {
+                    let windowHeight: CGFloat = 450
+                    let windowY = screenFrame.minY + 25
+                    let windowX = (screenFrame.width - 450) / 2
+                    selectorWindow?.setFrame(
+                        NSRect(
+                            x: windowX,
+                            y: windowY,
+                            width: 450,
+                            height: windowHeight
+                        ),
+                        display: false
+                    )
+                }
+                selectorWindow?.isMovableByWindowBackground = true
+            }
+            // 确保显示窗口
+            selectorWindow?.makeKeyAndOrderFront(nil)
+
+            // 确保激活应用并将窗口置顶
+            NSApp.activate(ignoringOtherApps: true)
+        } else {
+            selectorWindow?.orderOut(nil)
+        }
     }
     private func loadLyricsFromLocal() -> Bool {
         guard let modelContext = modelContainer?.mainContext else {
@@ -164,6 +359,7 @@ class AppDelegate: NSObject, NSApplicationDelegate,
 
         if let song = try? modelContext.fetch(descriptor).first {
             let localLyrics = song.getLyrics()
+            viewModel.currentTrack?.albumCover = song.cover
             if !localLyrics.isEmpty {
                 Log.general.debug("本地歌词")
                 viewModel.currentlyPlayingLyrics = localLyrics
@@ -212,7 +408,9 @@ class AppDelegate: NSObject, NSApplicationDelegate,
                 let song = Song(
                     id: trackInfo.trackID,
                     trackName: trackName,
-                    lyrics: finishLyrics
+                    lyrics: finishLyrics,
+                    cover: (viewModel.currentTrack?.albumCover)!
+                    
                 )
                 modelContext.insert(song)
                 try? modelContext.save()
@@ -254,6 +452,22 @@ class AppDelegate: NSObject, NSApplicationDelegate,
             try? modelContext?.save()
         }
 
+        Task {
+            if let onPlay = playbackNotifier?.onPlay {
+                await onPlay(nil, .lyrics)
+            }
+        }
+    }
+    @objc func delAllSongObject() {
+        
+        guard let modelContext = modelContainer?.mainContext else {return}
+        let descriptor = FetchDescriptor<Song>()
+        if let songs = try? modelContext.fetch(descriptor) {
+            for song in songs {
+                modelContext.delete(song)
+            }
+            try? modelContext.save()
+        }
         Task {
             if let onPlay = playbackNotifier?.onPlay {
                 await onPlay(nil, .lyrics)
@@ -309,7 +523,8 @@ class AppDelegate: NSObject, NSApplicationDelegate,
                 let songNew = Song(
                     id: currentTrack.trackID,
                     trackName: currentTrack.name,
-                    lyrics: finishLyrics
+                    lyrics: finishLyrics,
+                    cover: (viewModel.currentTrack?.albumCover)!
                 )
                 modelContext.insert(songNew)
 
@@ -324,23 +539,6 @@ class AppDelegate: NSObject, NSApplicationDelegate,
 
         } catch {
             Log.general.error("粘贴板获取歌词失败：\(error)")
-        }
-    }
-
-    @objc func similarSongTapped() {
-        guard let name = viewModel.currentTrack?.name,
-            let artist = viewModel.currentTrack?.artist
-        else {
-            return
-        }
-        Task {
-            let fetched = try? await networkUtil?.fetchSimilarSongs(
-                name: name,
-                artist: artist
-            )
-            Log.backend.debug("相似歌曲: \(JSON.stringify(fetched))")
-            guard let script = viewModel.appleMusicScript else { return }
-
         }
     }
 }

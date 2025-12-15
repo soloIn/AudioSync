@@ -5,11 +5,10 @@ import SwiftUI
 struct FullScreenView: View {
     @EnvironmentObject var viewmodel: ViewModel
     @State private var cachedColors: [Color] = []
-    @Binding var isPresented: Bool
 
     var body: some View {
         Group {
-            if isPresented {
+            if viewmodel.isFullScreenVisible {
                 ZStack {
                     GeometryReader { geo in
                         HStack {
@@ -713,8 +712,9 @@ struct FullScreenView: View {
     @ViewBuilder var albumArt: some View {
         VStack {
             Spacer()
-            if let album = viewmodel.currentTrack?.albumCover {
-                Image(nsImage: album)
+            if let album = viewmodel.currentTrack?.albumCover,
+                let albumImage = NSImage(data: album){
+                Image(nsImage: albumImage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .clipShape(
