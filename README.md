@@ -22,7 +22,8 @@
 
 - **相似歌手**：来源last.fm
 
-  <img width="362" height="544" alt="image" src="https://github.com/user-attachments/assets/4e791038-5ae1-4016-a1c2-1665996aed05" />
+  <img width="532" height="594" alt="image" src="https://github.com/user-attachments/assets/aa0f8e02-ebab-40ff-9f70-46643dd4d1a1" />
+
 
 
 
