@@ -36,7 +36,7 @@ class AppDelegate: NSObject, NSApplicationDelegate,
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         //只有菜单栏图标，无 Dock 图标
-        NSApp.setActivationPolicy(.accessory)
+        NSApp.setActivationPolicy(.regular)
         // 设置通知代理
         UNUserNotificationCenter.current().delegate = self
         Task { @MainActor in
@@ -114,6 +114,8 @@ class AppDelegate: NSObject, NSApplicationDelegate,
                 Log.backend.error("用户拒绝了通知权限")
             }
 
+            // 刚启动需要获取歌曲信息
+            await self.playbackNotifier?.obtainPlayback()
             // 触发启动时歌词显示
             if let onPlay = self.playbackNotifier?.onPlay {
                 await onPlay(nil, .lyrics)
@@ -176,8 +178,8 @@ class AppDelegate: NSObject, NSApplicationDelegate,
             .removeDuplicates()
             .sink { [weak self] needNanualSelection in
                 guard let self = self else { return }
-                Task{
-                    await MainActor.run{
+                Task {
+                    await MainActor.run {
                         self.toggleLyricsSelector(show: needNanualSelection)
                     }
                 }
@@ -197,14 +199,19 @@ class AppDelegate: NSObject, NSApplicationDelegate,
                     guard let selfOpenWindow = openWindow else { return }
                     Task {
                         await MainActor.run {
+                            // 1. 先激活应用 (ignoringOtherApps: true 是关键)
+                            NSApplication.shared.activate(
+                                ignoringOtherApps: true
+                            )
+
+                            // 2. 再打开窗口
                             selfOpenWindow(id: "fullScreen")
-                            NSApplication.shared.activate()
                         }
                     }
                 }
                 // 全屏时去掉卡拉OK显示
-                Task{
-                    await MainActor.run{
+                Task {
+                    await MainActor.run {
                         self.updateKaraokeWindow()
                     }
                 }
@@ -219,8 +226,8 @@ class AppDelegate: NSObject, NSApplicationDelegate,
                 )
                 viewModel.isViewLyricsShow =
                     isKaraokeVisible || viewModel.isFullScreenVisible
-                Task{
-                    await MainActor.run{
+                Task {
+                    await MainActor.run {
                         self.updateKaraokeWindow()
                     }
                 }
@@ -410,7 +417,7 @@ class AppDelegate: NSObject, NSApplicationDelegate,
                     trackName: trackName,
                     lyrics: finishLyrics,
                     cover: (viewModel.currentTrack?.albumCover)!
-                    
+
                 )
                 modelContext.insert(song)
                 try? modelContext.save()
@@ -459,8 +466,8 @@ class AppDelegate: NSObject, NSApplicationDelegate,
         }
     }
     @objc func delAllSongObject() {
-        
-        guard let modelContext = modelContainer?.mainContext else {return}
+
+        guard let modelContext = modelContainer?.mainContext else { return }
         let descriptor = FetchDescriptor<Song>()
         if let songs = try? modelContext.fetch(descriptor) {
             for song in songs {

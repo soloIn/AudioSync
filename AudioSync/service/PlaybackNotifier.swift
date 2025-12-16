@@ -33,6 +33,7 @@ struct TrackInfo: Encodable, Equatable {
 enum PlayState: String, Encodable {
     case playing
     case stop
+    case paused
 }
 enum PlaybackTrigger {
     case formatSwitch
@@ -79,7 +80,7 @@ class PlaybackNotifier {
             )
             return
         }
-
+        let playState = playerStateFromNotifier(state)
         let uniqueKey = userInfo.uniqueKey(using: [
             "Name", "Artist", "Album", "Player State",
         ])
@@ -91,12 +92,12 @@ class PlaybackNotifier {
         let songKey = userInfo.uniqueKey(using: [
             "Name", "Artist", "Album",
         ])
-    
-        viewModel.isCurrentTrackPlaying = (state == "Playing")
+
+        viewModel.isCurrentTrackPlaying = (playState == PlayState.playing)
         Log.backend.info("appleNotification userInfo: \(userInfo)")
         let nextAlbum = userInfo["Album"] as? String ?? ""
         let nextName = userInfo["Name"] as? String ?? ""
-        if !lock && state == "Playing" && !nextAlbum.isEmpty
+        if !lock && playState == PlayState.playing && !nextAlbum.isEmpty
             && viewModel.currentAlbum != nextAlbum && viewModel.enableAudioSync
         {
             lock = true
@@ -109,7 +110,7 @@ class PlaybackNotifier {
                 if let onPlay = self.onPlay {
                     await onPlay(nil, .formatSwitch)  // 等待执行完
                 }
-                
+
                 script.setPlayerPosition?(0.0)
                 await waitUntilPaused(script)
                 script.playpause?()
@@ -117,7 +118,7 @@ class PlaybackNotifier {
 
             }
         }
-        if state != "Playing" {
+        if playState != PlayState.playing {
             viewModel.isLyricsPlaying = false
         }
         let nextArtist = userInfo["Artist"] as? String ?? ""
@@ -127,11 +128,13 @@ class PlaybackNotifier {
             Task {
                 let trackID = try await IDFetcher.fetchTrackID(
                     name: nextName,
-                    artist: nextArtist
+                    artist: nextArtist,
+                    album: nextAlbum
                 )
                 let albumData = try await IDFetcher.fetchArtworkData(
                     name: nextName,
-                    artist: nextArtist
+                    artist: nextArtist,
+                    album: nextAlbum
                 )
 
                 let trackInfo = TrackInfo(
@@ -140,7 +143,7 @@ class PlaybackNotifier {
                     albumArtist: nextAlbum,
                     trackID: String(trackID),
                     album: nextAlbum,
-                    state: stringFromPlayerState(state),
+                    state: playState,
                     genre: genre,
                     color: NSImage(data: albumData)?.findDominantColors(),
                     albumCover: albumData
@@ -162,12 +165,64 @@ class PlaybackNotifier {
 
     }
 
-    func stringFromPlayerState(_ state: String) -> PlayState {
+    func playerStateFromNotifier(_ state: String) -> PlayState {
         switch state {
-        case "Playing": return .playing
-        case "Paused": return .stop
+        case "Playing": return PlayState.playing
         default: return .stop
         }
+    }
+    func playerStateFromScript(_ state: MusicEPlS) -> PlayState {
+        switch state {
+        case MusicEPlS.playing: return PlayState.playing
+        default: return .stop
+        }
+    }
+    func obtainPlayback() async {
+        guard let script = self.appleMusicScript else { return }
+        guard let album = script.currentTrack?.album,
+            let artist = script.currentTrack?.artist,
+            let name = script.currentTrack?.name,
+            let genre = script.currentTrack?.genre,
+            let albumArtist = script.currentTrack?.albumArtist,
+            let state = script.playerState
+        else { return }
+
+        guard
+            let trackID = try? await IDFetcher.fetchTrackID(
+                name: name,
+                artist: artist,
+                album: album
+            ),
+            let albumData = try? await IDFetcher.fetchArtworkData(
+                name: name,
+                artist: artist,
+                album: album
+            )
+        else { return }
+        let trackInfo = TrackInfo(
+            name: name,
+            artist: artist,
+            albumArtist: albumArtist,
+            trackID: String(trackID),
+            album: album,
+            state: playerStateFromScript(state),
+            genre: genre,
+            color: NSImage(data: albumData)?.findDominantColors(),
+            albumCover: albumData
+        )
+        viewModel.currentTrack = trackInfo
+        let keyInfo: [AnyHashable: Any] = [
+            "Artist": artist,
+            "Album": album,
+            "Name": name,
+        ]
+
+        let songKey = keyInfo.uniqueKey(using: [
+            "Name", "Artist", "Album",
+        ])
+        viewModel.currentSongKey = songKey
+        viewModel.isCurrentTrackPlaying = (state == MusicEPlS.playing)
+
     }
     func waitUntilPaused(
         _ script: MusicApplication,
@@ -179,7 +234,9 @@ class PlaybackNotifier {
             }
 
             if isPaused {
-                Log.backend.info("waitUntilPaused active play time consuming : \(i * 80) ms")
+                Log.backend.info(
+                    "waitUntilPaused active play time consuming : \(i * 80) ms"
+                )
                 return
             }
 

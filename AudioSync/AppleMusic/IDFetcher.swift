@@ -68,27 +68,30 @@ public enum IDFetcher {
     public static func fetchArtistID(
         name: String,
         artist: String,
+        album: String,
         countryCode: String = "cn"
     ) async throws -> Int {
-        let song = try await fetchSong(by: name, by: artist)
+        let song = try await fetchSong(by: name, by: artist, by: album)
         return song.artistId
     }
 
     public static func fetchTrackID(
         name: String,
         artist: String,
+        album: String,
         countryCode: String = "cn"
     ) async throws -> Int {
-        let song = try await fetchSong(by: name, by: artist)
+        let song = try await fetchSong(by: name, by: artist, by: album)
         return song.trackId
     }
 
     public static func fetchArtworkData(
         name: String,
         artist: String,
+        album: String,
         countryCode: String = "cn"
     ) async throws -> Data {
-        let song = try await fetchSong(by: name, by: artist)
+        let song = try await fetchSong(by: name, by: artist, by: album)
         // 1. 构造 URL
         guard let url = URL(string: song.artworkUrl) else {
             throw IDFetchError.invalidURL
@@ -115,6 +118,7 @@ public enum IDFetcher {
     private static func fetchSong(
         by name: String,
         by artist: String,
+        by album: String,
         countryCode: String = "cn"
     ) async throws -> SongSearchResult.Song {
 
@@ -142,6 +146,7 @@ public enum IDFetcher {
             let song = try await fetchSongFromNetwork(
                 name: name,
                 artist: artist,
+                album: album,
                 countryCode: countryCode
             )
 
@@ -158,13 +163,14 @@ public enum IDFetcher {
     private static func fetchSongFromNetwork(
         name: String,
         artist: String,
+        album: String,
         countryCode: String = "cn"
     ) async throws -> SongSearchResult.Song {
         // 1. URL 构造
         let baseURL = "https://itunes.apple.com/search"
 
         // 对名字进行 URL 编码，以处理空格和特殊字符
-        let term = "\(name) \(artist)"
+        let term = "\(name) \(artist) \(album)"
         guard
             let encodedTerm = term.addingPercentEncoding(
                 withAllowedCharacters: .urlQueryAllowed

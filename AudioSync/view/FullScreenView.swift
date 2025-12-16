@@ -789,6 +789,11 @@ struct FullScreenView: View {
             }
             Spacer()
         }
+        .transaction { tx in
+                tx.animation = nil
+            }
+        .drawingGroup()
+        
     }
 
 }

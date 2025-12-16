@@ -82,21 +82,26 @@ struct AudioSyncApp: App {
                 viewModel
             )
             .onWindowDidAppear { window in
-                window.collectionBehavior = .fullScreenPrimary
-
-                // 阻止 ESC
-                NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
-                    event in
-                    if event.keyCode == 53 { return nil }  // Esc
-                    return event
+                // 1. 标记为全屏主窗口
+                window.collectionBehavior = [
+                    .fullScreenPrimary, .canJoinAllSpaces,
+                ]
+                // 2. 强制窗口显示并获取焦点
+                window.makeKeyAndOrderFront(nil)
+                // 3. 延迟执行进入全屏
+                // 使用 asyncAfter 给窗口初始化和“飞入”动画留出一点缓冲时间
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {  // 0.2秒通常足够
+                    if !window.styleMask.contains(.fullScreen) {
+                        window.toggleFullScreen(nil)
+                    }
                 }
 
-                // 设置退出全屏时关闭窗口
+                // 3. 监听退出全屏
                 let delegate = FullScreenWindowDelegate()
                 delegate.onExitFullScreen = {
                     viewModel.isFullScreenVisible = false
-                    window.close()
                 }
+                delegate.installEscBlocker()
                 window.delegate = delegate
 
                 // 将 delegate 附着到 window 上，避免释放
@@ -106,11 +111,6 @@ struct AudioSyncApp: App {
                     delegate,
                     .OBJC_ASSOCIATION_RETAIN_NONATOMIC
                 )
-
-                // 切换到全屏
-                if !window.styleMask.contains(.fullScreen) {
-                    window.toggleFullScreen(nil)
-                }
             }
             .onDisappear {
                 viewModel.isFullScreenVisible = false
@@ -141,7 +141,7 @@ struct AudioSyncApp: App {
         Divider()
         Button("删除所有缓存", action: appDelegate.delAllSongObject)
         Divider()
-        
+
         Button("退出") {
             NSApplication.shared.terminate(nil)
         }
@@ -160,11 +160,9 @@ struct WindowFinder: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSView {
         let nsView = NSView()
-        if let window = nsView.window {
-            Task {
-                await MainActor.run {
-                    onWindow(window)
-                }
+        DispatchQueue.main.async {
+            if let window = nsView.window {
+                onWindow(window)
             }
         }
         return nsView
@@ -176,11 +174,34 @@ struct WindowFinder: NSViewRepresentable {
 // NSWindowDelegate 实现，处理退出全屏
 class FullScreenWindowDelegate: NSObject, NSWindowDelegate {
     var onExitFullScreen: (() -> Void)?
+    private var escMonitor: Any?
+    // 阻止 ESC
+    func installEscBlocker() {
+        escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
+            event in
+            if event.keyCode == 53 {
+                return nil
+            }
+            return event
+        }
+    }
+
+    func removeEscBlocker() {
+        if let escMonitor {
+            NSEvent.removeMonitor(escMonitor)
+            self.escMonitor = nil
+        }
+    }
 
     func windowDidExitFullScreen(_ notification: Notification) {
         // 延迟关闭，等系统完成退出动画
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            self.removeEscBlocker()
             self.onExitFullScreen?()
+            // 只隐藏，不 close
+            if let window = notification.object as? NSWindow {
+                window.close()
+            }
         }
     }
 }

@@ -81,7 +81,8 @@ struct SimilarArtistRowView: View {
         Task {
             let artistID = try await IDFetcher.fetchArtistID(
                 name: "",
-                artist: artist
+                artist: artist,
+                album: ""
             )
             // 步骤 2: 使用 ID 跳转到艺术家主页 (使用 Universal Link，如 MusicNavigator 中所推荐)
             _ = try MusicNavigator.openArtistPage(
@@ -100,7 +101,7 @@ struct HoverableContentView: View {
                 .foregroundColor(Color(NSColor.tertiaryLabelColor))
                 .lineLimit(3)
                 .multilineTextAlignment(.leading)
-                .systemTooltip(content)
+                .systemTooltip(content.toSimplified)
         }
     }
 }

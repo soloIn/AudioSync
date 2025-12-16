@@ -49,21 +49,22 @@ public class NetworkService {
                 effectiveAlbum = originalNameResult.album
             }
         }
-        // 尝试网易云音乐
-        var lyrics = await fetchNetEaseLyrics(
+        
+        // 尝试 QQ 音乐
+        var lyrics = await fetchQQLyrics(
             trackName: effectiveTrackName,
             artist: effectiveArtist,
-            trackID: trackID,  // trackID 似乎未使用，但保持签名一致
             album: effectiveAlbum
         )
         if !lyrics.isEmpty {
             return lyrics
         }
-
-        // 尝试 QQ 音乐
-        lyrics = await fetchQQLyrics(
+        
+        // 尝试网易云音乐
+        lyrics = await fetchNetEaseLyrics(
             trackName: effectiveTrackName,
             artist: effectiveArtist,
+            trackID: trackID,  // trackID 似乎未使用，但保持签名一致
             album: effectiveAlbum
         )
         if !lyrics.isEmpty {
@@ -98,7 +99,7 @@ public class NetworkService {
         if shouldAskForManualSelection {
             Log.general.info("等待用户手动选择...")
             // 为 continuation 添加超时机制
-            let continuationTimeout: TimeInterval = 20.0  // 例如 10 秒超时
+            let continuationTimeout: TimeInterval = 15.0
 
             do {
                 let selectedSong: CandidateSong =
