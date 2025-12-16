@@ -36,7 +36,7 @@ class AppDelegate: NSObject, NSApplicationDelegate,
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         //只有菜单栏图标，无 Dock 图标
-        NSApp.setActivationPolicy(.regular)
+        NSApp.setActivationPolicy(.accessory)
         // 设置通知代理
         UNUserNotificationCenter.current().delegate = self
         Task { @MainActor in
@@ -199,6 +199,9 @@ class AppDelegate: NSObject, NSApplicationDelegate,
                     guard let selfOpenWindow = openWindow else { return }
                     Task {
                         await MainActor.run {
+                            // ⭐ 先切为 regular
+                            NSApp.setActivationPolicy(.regular)
+
                             // 1. 先激活应用 (ignoringOtherApps: true 是关键)
                             NSApplication.shared.activate(
                                 ignoringOtherApps: true
@@ -404,7 +407,7 @@ class AppDelegate: NSObject, NSApplicationDelegate,
             ), !lyrics.isEmpty {
                 let finishLyrics = finishLyric(lyrics)
                 Log.general.debug("网络歌词")
-
+                Log.general.debug("lyrics: \n\(finishLyrics)")
                 viewModel.currentlyPlayingLyrics = finishLyrics
                 viewModel.isLyricsPlaying = true
 
@@ -435,12 +438,40 @@ class AppDelegate: NSObject, NSApplicationDelegate,
     }
 
     func finishLyric(_ rawLyrics: [LyricLine]) -> [LyricLine] {
+        guard rawLyrics.count > 1 else { return rawLyrics }
+
+        var result: [LyricLine] = []
+        let count = rawLyrics.count
+
+        for index in 0..<count {
+            let current = rawLyrics[index]
+
+            // 判断是否是空行
+            let isEmptyLine = current.words.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).isEmpty
+
+            // 如果是空行，且不是最后一行，检查时间差
+            if isEmptyLine, index + 1 < count {
+                let next = rawLyrics[index + 1]
+                let delta = next.startTimeMS - current.startTimeMS
+
+                // 小于 5 秒的空行 → 合并（即跳过）
+                if delta < 5000 {
+                    continue
+                }
+            }
+
+            // 其他情况正常保留
+            result.append(current)
+        }
         guard let last = rawLyrics.last else { return rawLyrics }
         let virtualEndLine = LyricLine(
             startTime: last.startTimeMS + 5000,
             words: ""
         )
-        return rawLyrics + [virtualEndLine]
+
+        return result + [virtualEndLine]
     }
 
     @objc func delCurrentSongObject() {

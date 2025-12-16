@@ -27,7 +27,6 @@ struct KaraokeView: View {
                             size: 0.9 * (viewmodel.karaokeFont.pointSize)
                         )
                     )
-                //                    .opacity(0.85)
             }
         }
     }
@@ -43,7 +42,7 @@ struct KaraokeView: View {
         {
             multilingualView(currentlyPlayingLyricsIndex)
         } else {
-            Text("···")
+            Text("🎶 🎶 🎶 🎶 🎶")
         }
     }
     var body: some View {

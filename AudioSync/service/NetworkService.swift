@@ -49,7 +49,7 @@ public class NetworkService {
                 effectiveAlbum = originalNameResult.album
             }
         }
-        
+
         // 尝试 QQ 音乐
         var lyrics = await fetchQQLyrics(
             trackName: effectiveTrackName,
@@ -59,7 +59,7 @@ public class NetworkService {
         if !lyrics.isEmpty {
             return lyrics
         }
-        
+
         // 尝试网易云音乐
         lyrics = await fetchNetEaseLyrics(
             trackName: effectiveTrackName,
@@ -133,7 +133,9 @@ public class NetworkService {
                     }
                 // 用户选择后，根据 ID 获取歌词
                 // 先替换封面
-                let coverData = try? await fetchImageData(selectedSong.albumCover)
+                let coverData = try? await fetchImageData(
+                    selectedSong.albumCover
+                )
                 await MainActor.run {
                     viewModel.currentTrack?.albumCover = coverData
                 }
@@ -212,8 +214,13 @@ public class NetworkService {
                         let source = artists[i].sourceName
 
                         group.addTask {
-                            let coverData = try? await self.fetchNetEaseArtistCover(name: name)
-                            async let info = try? await self.fetchArtistInfo(artist: source)
+                            let coverData =
+                                try? await self.fetchNetEaseArtistCover(
+                                    name: name
+                                )
+                            async let info = try? await self.fetchArtistInfo(
+                                artist: source
+                            )
 
                             let bio = await info?.artist.bio.content
 
@@ -742,7 +749,9 @@ public class NetworkService {
         }
         return similarArtists
     }
-    func fetchArtistInfo(artist: String) async throws -> ArtistFromLastFMResponse{
+    func fetchArtistInfo(artist: String) async throws
+        -> ArtistFromLastFMResponse
+    {
         let request = URLRequest(
             url: URL(
                 string:

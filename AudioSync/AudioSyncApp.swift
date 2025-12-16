@@ -197,11 +197,14 @@ class FullScreenWindowDelegate: NSObject, NSWindowDelegate {
         // 延迟关闭，等系统完成退出动画
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             self.removeEscBlocker()
-            self.onExitFullScreen?()
+
             // 只隐藏，不 close
             if let window = notification.object as? NSWindow {
-                window.close()
+                window.orderOut(nil)
             }
+            // ⭐ 切回无 Dock
+            NSApp.setActivationPolicy(.accessory)
+            self.onExitFullScreen?()
         }
     }
 }
